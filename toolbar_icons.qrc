@@ -1,0 +1,13 @@
+<RCC>
+    <qresource prefix="/">
+        <file>images/connect-broker.png</file>
+        <file>images/disconnect-broker.png</file>
+        <file>images/pause.png</file>
+        <file>images/play.png</file>
+        <file>images/purge.png</file>
+        <file>images/delete.png</file>
+        <file>images/copy.png</file>
+        <file>images/trace.png</file>
+        <file>images/logo.png</file>
+    </qresource>
+</RCC>
