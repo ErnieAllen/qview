@@ -26,5 +26,8 @@ LD_LIBRARY_PATH = $TRUNK/qpid/cpp/src/.libs:/usr/lib64
 Usage: qview [<broker url>  <connect options> <qmf options>]
 If no command line options are supplied, no connection is attempted at startup
 
+The file broker_methods_2.diff needs to be applied to qpid broker
+version 1151937 under <qpid trunk>/qpid
+
 
 

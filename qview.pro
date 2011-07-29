@@ -36,7 +36,8 @@ FORMS    += \
 
 OTHER_FILES += \
     license.txt \
-    README.txt 
+    README.txt \ 
+    broker_methods_2.diff
 
 RESOURCES += \
     toolbar_icons.qrc

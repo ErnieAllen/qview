@@ -1,0 +1,759 @@
+Index: cpp/src/qpid/broker/Fairshare.h
+===================================================================
+--- cpp/src/qpid/broker/Fairshare.h	(revision 1151531)
++++ cpp/src/qpid/broker/Fairshare.h	(working copy)
+@@ -45,6 +45,7 @@
+     static std::auto_ptr<Messages> create(const qpid::framing::FieldTable& settings);
+     static bool getState(const Messages&, uint& priority, uint& count);
+     static bool setState(Messages&, uint priority, uint count);
++    void getBody ( MessageId, std::string & ) { QPID_LOG ( critical, "MDEBUG: Fairshare::getBody"); }
+   private:
+     std::vector<uint> limits;
+ 
+Index: cpp/src/qpid/broker/PriorityQueue.h
+===================================================================
+--- cpp/src/qpid/broker/PriorityQueue.h	(revision 1151531)
++++ cpp/src/qpid/broker/PriorityQueue.h	(working copy)
+@@ -23,6 +23,7 @@
+  */
+ #include "qpid/broker/Messages.h"
+ #include "qpid/sys/IntegerTypes.h"
++#include "qpid/log/Statement.h"
+ #include <deque>
+ #include <vector>
+ 
+@@ -55,6 +56,9 @@
+     void foreach(Functor);
+     void removeIf(Predicate);
+     static uint getPriority(const QueuedMessage&);
++    void getIds ( IdVector & );
++    void getHeader ( MessageId, types::Variant::Map & result ); 
++    void getBody ( MessageId, std::string & );
+   protected:
+     typedef std::deque<QueuedMessage> Deque;
+     typedef std::vector<Deque> PriorityLevels;
+Index: cpp/src/qpid/broker/MessageDeque.cpp
+===================================================================
+--- cpp/src/qpid/broker/MessageDeque.cpp	(revision 1151531)
++++ cpp/src/qpid/broker/MessageDeque.cpp	(working copy)
+@@ -20,7 +20,9 @@
+  */
+ #include "qpid/broker/MessageDeque.h"
+ #include "qpid/broker/QueuedMessage.h"
++#include "qpid/log/Statement.h"
+ 
++
+ namespace qpid {
+ namespace broker {
+ 
+@@ -137,4 +139,12 @@
+     }
+ }
+ 
++
++void MessageDeque::getIds ( IdVector & v ) {
++    for (Deque::iterator i = messages.begin(); i != messages.end();) {
++        v.push_back ( i->getId() );
++    }
++}
++
++
+ }} // namespace qpid::broker
+Index: cpp/src/qpid/broker/Queue.cpp
+===================================================================
+--- cpp/src/qpid/broker/Queue.cpp	(revision 1151531)
++++ cpp/src/qpid/broker/Queue.cpp	(working copy)
+@@ -42,8 +42,15 @@
+ #include "qpid/sys/ClusterSafe.h"
+ #include "qpid/sys/Monitor.h"
+ #include "qpid/sys/Time.h"
++
++#include "qpid/types/Variant.h"
++
+ #include "qmf/org/apache/qpid/broker/ArgsQueuePurge.h"
+ #include "qmf/org/apache/qpid/broker/ArgsQueueReroute.h"
++#include "qmf/org/apache/qpid/broker/ArgsQueueGetIdList.h"
++#include "qmf/org/apache/qpid/broker/ArgsQueueGetHeader.h"
++#include "qmf/org/apache/qpid/broker/ArgsQueueGetBody.h"
++#include "qmf/org/apache/qpid/broker/ArgsQueueRemove.h"
+ 
+ #include <iostream>
+ #include <algorithm>
+@@ -1062,6 +1069,49 @@
+         }
+         break;
+ 
++    case _qmf::Queue::METHOD_GETIDLIST :
++        {
++            _qmf::ArgsQueueGetIdList& getIdListArgs = (_qmf::ArgsQueueGetIdList&) args;
++
++            IdVector v;
++            getIds ( v );
++            for ( IdVector::iterator i = v.begin(); i != v.end(); ++ i ) {
++                getIdListArgs.o_list.push_back ( qpid::types::Variant(*i) );
++            }
++            status = Manageable::STATUS_OK;
++        }
++        break;
++
++    case _qmf::Queue::METHOD_GETHEADER :
++        {
++            _qmf::ArgsQueueGetHeader& getHeaderArgs = (_qmf::ArgsQueueGetHeader&) args;
++            QPID_LOG ( critical, "MDEBUG: _qmf::Queue::METHOD_GETHEADER !!! get header number " << getHeaderArgs.i_id );
++            getHeader ( getHeaderArgs.i_id,  getHeaderArgs.o_map );
++            QPID_LOG ( critical, "MDEBUG: well ... something happened." );
++            status = Manageable::STATUS_OK;
++        }
++        break;
++
++
++    case _qmf::Queue::METHOD_GETBODY :
++        {
++            _qmf::ArgsQueueGetBody& getBodyArgs = (_qmf::ArgsQueueGetBody&) args;
++            QPID_LOG ( critical, "MDEBUG: _qmf::Queue::METHOD_GETBODY !!! get header number " << getBodyArgs.i_id );
++            getBody ( getBodyArgs.i_id,  getBodyArgs.o_body );
++            status = Manageable::STATUS_OK;
++        }
++        break;
++
++    case _qmf::Queue::METHOD_REMOVE :
++        {
++            _qmf::ArgsQueueRemove& removeArgs = (_qmf::ArgsQueueRemove&) args;
++            QPID_LOG ( critical, "MDEBUG: _qmf::Queue::METHOD_REMOVE !!! get id number " << removeArgs.i_id );
++            removeMessage ( removeArgs.i_id );
++            status = Manageable::STATUS_OK;
++        }
++        break;
++
++
+     case _qmf::Queue::METHOD_REROUTE :
+         {
+             _qmf::ArgsQueueReroute& rerouteArgs = (_qmf::ArgsQueueReroute&) args;
+@@ -1228,3 +1278,21 @@
+     parent.deleted = true;
+     while (count) parent.messageLock.wait();
+ }
++
++void Queue::getIds ( IdVector & v ) {
++    messages->getIds ( v );
++}
++
++void Queue::getHeader ( MessageId id, types::Variant::Map & resultMap ) {
++    messages->getHeader ( id, resultMap );
++}
++
++void Queue::getBody ( MessageId id, std::string & body ) {
++    messages->getBody ( id, body );
++}
++
++void Queue::removeMessage ( MessageId id ) {
++    QueuedMessage dontCare;
++    messages->remove ( id, dontCare );
++}
++
+Index: cpp/src/qpid/broker/Broker.h
+===================================================================
+--- cpp/src/qpid/broker/Broker.h	(revision 1151531)
++++ cpp/src/qpid/broker/Broker.h	(working copy)
+@@ -158,6 +158,11 @@
+     void deleteObject(const std::string& type, const std::string& name,
+                       const qpid::types::Variant::Map& options, const ConnectionState* context);
+ 
++    void queueGetIdList        ( const std::string & queue_name, qpid::types::Variant::List & list );
++    void queueGetMessageHeader ( const std::string & queue_name, uint32_t messageId, types::Variant::Map & map );
++    void queueGetMessageBody   ( const std::string & queue_name, uint32_t messageId, std::string & body );
++    void queueRemoveMessage    ( const std::string & queue_name, uint32_t messageId );
++
+     boost::shared_ptr<sys::Poller> poller;
+     sys::Timer timer;
+     std::auto_ptr<sys::Timer> clusterTimer;
+Index: cpp/src/qpid/broker/QueuedMessage.h
+===================================================================
+--- cpp/src/qpid/broker/QueuedMessage.h	(revision 1151531)
++++ cpp/src/qpid/broker/QueuedMessage.h	(working copy)
+@@ -38,6 +38,9 @@
+     QueuedMessage(Queue* q, boost::intrusive_ptr<Message> msg, framing::SequenceNumber sn) : 
+         payload(msg), position(sn), queue(q) {}
+     QueuedMessage(Queue* q) : queue(q) {}
++
++    // delete_me -- uint32_t getId() { return payload->getId(); }
++    uint32_t getId() { return position; }
+     
+ };
+     inline bool operator<(const QueuedMessage& a, const QueuedMessage& b) { return a.position < b.position; } 
+Index: cpp/src/qpid/broker/LegacyLVQ.h
+===================================================================
+--- cpp/src/qpid/broker/LegacyLVQ.h	(revision 1151531)
++++ cpp/src/qpid/broker/LegacyLVQ.h	(working copy)
+@@ -22,6 +22,8 @@
+  *
+  */
+ #include "qpid/broker/MessageMap.h"
++       #include "qpid/log/Statement.h"   // MDEBUG
++
+ #include <memory>
+ 
+ namespace qpid {
+@@ -48,6 +50,10 @@
+     static std::auto_ptr<Messages> updateOrReplace(std::auto_ptr<Messages> current, 
+                                                    const std::string& key, bool noBrowse,
+                                                    Broker* broker);
++    void getIds ( IdVector & ) { }
++    void getHeader ( MessageId, types::Variant::Map & ) { QPID_LOG ( critical, "MDEBUG: LegacyLVQ::getHeader"); }
++    void getBody ( MessageId, std::string & ) { QPID_LOG ( critical, "MDEBUG: LegacyLVQ::getBody"); }
++
+   protected:
+     bool noBrowse;
+     Broker* broker;
+Index: cpp/src/qpid/broker/Broker.cpp
+===================================================================
+--- cpp/src/qpid/broker/Broker.cpp	(revision 1151531)
++++ cpp/src/qpid/broker/Broker.cpp	(working copy)
+@@ -41,6 +41,10 @@
+ #include "qmf/org/apache/qpid/broker/ArgsBrokerGetLogLevel.h"
+ #include "qmf/org/apache/qpid/broker/ArgsBrokerQueueMoveMessages.h"
+ #include "qmf/org/apache/qpid/broker/ArgsBrokerSetLogLevel.h"
++#include "qmf/org/apache/qpid/broker/ArgsBrokerQueueGetIdList.h"
++#include "qmf/org/apache/qpid/broker/ArgsBrokerQueueGetMessageHeader.h"
++#include "qmf/org/apache/qpid/broker/ArgsBrokerQueueGetMessageBody.h"
++#include "qmf/org/apache/qpid/broker/ArgsBrokerQueueRemoveMessage.h"
+ #include "qmf/org/apache/qpid/broker/EventExchangeDeclare.h"
+ #include "qmf/org/apache/qpid/broker/EventExchangeDelete.h"
+ #include "qmf/org/apache/qpid/broker/EventQueueDeclare.h"
+@@ -459,6 +463,46 @@
+             return Manageable::STATUS_PARAMETER_INVALID;
+         break;
+       }
++    case _qmf::Broker::METHOD_QUEUEGETIDLIST : {
++        QPID_LOG (debug, "Broker::queueGetIdList()");
++        _qmf::ArgsBrokerQueueGetIdList & getIdListArgs =
++          dynamic_cast < _qmf::ArgsBrokerQueueGetIdList & > ( args );
++          queueGetIdList ( getIdListArgs.i_name, getIdListArgs.o_list );
++          status = Manageable::STATUS_OK;
++        break;
++      }
++    case _qmf::Broker::METHOD_QUEUEGETMESSAGEHEADER : {
++        QPID_LOG (debug, "Broker::queueGetMessageHeader()");
++        _qmf::ArgsBrokerQueueGetMessageHeader & queueGetMessageHeaderArgs =
++          dynamic_cast < _qmf::ArgsBrokerQueueGetMessageHeader & > ( args );
++          queueGetMessageHeader ( queueGetMessageHeaderArgs.i_name, 
++                                  queueGetMessageHeaderArgs.i_id,
++                                  queueGetMessageHeaderArgs.o_map
++                                );
++          status = Manageable::STATUS_OK;
++        break;
++      }
++    case _qmf::Broker::METHOD_QUEUEGETMESSAGEBODY : {
++        QPID_LOG (debug, "Broker::queueGetMessageBody()");
++        _qmf::ArgsBrokerQueueGetMessageBody & queueGetMessageBodyArgs =
++          dynamic_cast < _qmf::ArgsBrokerQueueGetMessageBody & > ( args );
++          queueGetMessageBody ( queueGetMessageBodyArgs.i_name, 
++                                queueGetMessageBodyArgs.i_id,
++                                queueGetMessageBodyArgs.o_body
++                              );
++          status = Manageable::STATUS_OK;
++        break;
++      }
++    case _qmf::Broker::METHOD_QUEUEREMOVEMESSAGE : {
++        QPID_LOG (debug, "Broker::queueRemoveMessage()");
++        _qmf::ArgsBrokerQueueRemoveMessage & queueRemoveMessageArgs =
++          dynamic_cast < _qmf::ArgsBrokerQueueRemoveMessage & > ( args );
++          queueRemoveMessage ( queueRemoveMessageArgs.i_name, 
++                               queueRemoveMessageArgs.i_id
++                             );
++          status = Manageable::STATUS_OK;
++        break;
++      }
+     case _qmf::Broker::METHOD_SETLOGLEVEL :
+         setLogLevel(dynamic_cast<_qmf::ArgsBrokerSetLogLevel&>(args).i_level);
+         QPID_LOG (debug, "Broker::setLogLevel()");
+@@ -965,5 +1009,40 @@
+     }
+ }
+ 
++void Broker::queueGetIdList ( const std::string & queue_name, Variant::List & list ) {
++    Queue::shared_ptr target_queue = queues.find ( queue_name );
++    if ( target_queue ) {
++        IdVector v;
++        target_queue->getIds ( v );
++        for ( IdVector::iterator i = v.begin(); i != v.end(); ++ i ) {
++            list.push_back ( qpid::types::Variant(*i) );
++        }
++    }
++}
++
++void Broker::queueGetMessageHeader ( const std::string & queue_name, uint32_t messageId, types::Variant::Map & map ) {
++    Queue::shared_ptr target_queue = queues.find ( queue_name );
++    if ( target_queue ) {
++        target_queue->getHeader ( messageId, map );
++    }
++}
++
++
++void Broker::queueGetMessageBody ( const std::string & queue_name, uint32_t messageId, std::string & body ) {
++    Queue::shared_ptr target_queue = queues.find ( queue_name );
++    if ( target_queue ) {
++        target_queue->getBody ( messageId, body );
++    }
++}
++
++
++void Broker::queueRemoveMessage ( const std::string & queue_name, uint32_t messageId ) {
++    Queue::shared_ptr target_queue = queues.find ( queue_name );
++    if ( target_queue ) {
++        target_queue->removeMessage ( messageId );
++    }
++}
++
++
+ }} // namespace qpid::broker
+ 
+Index: cpp/src/qpid/broker/Connection.h
+===================================================================
+--- cpp/src/qpid/broker/Connection.h	(revision 1151531)
++++ cpp/src/qpid/broker/Connection.h	(working copy)
+@@ -163,6 +163,12 @@
+     // Used by cluster during catch-up, see cluster::OutputInterceptor
+     void doIoCallbacks();
+ 
++    std::string & getMech ( ) { return mech; }
++    void setMech ( std::string s ) { mech = s; }
++
++    int getSsf ( ) { return ssf; }
++    void setSsf ( int i ) { ssf = i; }
++
+   private:
+     typedef boost::ptr_map<framing::ChannelId, SessionHandler> ChannelMap;
+     typedef std::vector<boost::shared_ptr<Queue> >::iterator queue_iterator;
+@@ -205,8 +211,10 @@
+     };
+     OutboundFrameTracker outboundTracker;
+ 
++    void sent(const framing::AMQFrame& f);
+ 
+-    void sent(const framing::AMQFrame& f);
++    int ssf;
++    std::string mech;
+   public:
+     qmf::org::apache::qpid::broker::Connection* getMgmtObject() { return mgmtObject; }
+ };
+Index: cpp/src/qpid/broker/Messages.h
+===================================================================
+--- cpp/src/qpid/broker/Messages.h	(revision 1151531)
++++ cpp/src/qpid/broker/Messages.h	(working copy)
+@@ -21,8 +21,11 @@
+  * under the License.
+  *
+  */
++#include <vector>
+ #include <boost/function.hpp>
++#include "qpid/types/Variant.h"
+ 
++
+ namespace qpid {
+ namespace framing {
+ class SequenceNumber;
+@@ -30,6 +33,10 @@
+ namespace broker {
+ struct QueuedMessage;
+ 
++
++typedef uint32_t MessageId;
++typedef std::vector<MessageId> IdVector;
++
+ /**
+  * This interface abstracts out the access to the messages held for
+  * delivery by a Queue instance. Note the the assumption at present is
+@@ -111,6 +118,21 @@
+      * predicate returns true
+      */
+     virtual void removeIf(Predicate) = 0;
++
++    /**
++     * Return the IDs of all the messages in the queue.
++     */
++    virtual void getIds ( IdVector & ) = 0;
++
++    /**
++     * Return the header of the message with the given ID.
++     */
++    virtual void getHeader ( MessageId, types::Variant::Map & result ) = 0;
++
++    /**
++     * Return the body of the message with the given ID.
++     */
++    virtual void getBody ( MessageId, std::string & ) = 0;
+   private:
+ };
+ }} // namespace qpid::broker
+Index: cpp/src/qpid/broker/MessageDeque.h
+===================================================================
+--- cpp/src/qpid/broker/MessageDeque.h	(revision 1151531)
++++ cpp/src/qpid/broker/MessageDeque.h	(working copy)
+@@ -23,11 +23,14 @@
+  */
+ #include "qpid/broker/Messages.h"
+ #include "qpid/broker/QueuedMessage.h"
++#include "qpid/log/Statement.h"   // MDEBUG
++
+ #include <deque>
+ 
+ namespace qpid {
+ namespace broker {
+ 
++
+ /**
+  * Provides the standard FIFO queue behaviour.
+  */
+@@ -50,6 +53,10 @@
+     void foreach(Functor);
+     void removeIf(Predicate);
+ 
++    void getIds ( IdVector & );
++    void getHeader ( MessageId, types::Variant::Map & /*result*/ ) { QPID_LOG ( critical, "MDEBUG: MessageDeque::getHeader"); }
++    void getBody ( MessageId, std::string & ) { QPID_LOG ( critical, "MDEBUG: MessageDeque::getBody"); }
++
+   private:
+     typedef std::deque<QueuedMessage> Deque;
+     Deque messages;
+Index: cpp/src/qpid/broker/MessageMap.h
+===================================================================
+--- cpp/src/qpid/broker/MessageMap.h	(revision 1151531)
++++ cpp/src/qpid/broker/MessageMap.h	(working copy)
+@@ -23,6 +23,7 @@
+  */
+ #include "qpid/broker/Messages.h"
+ #include "qpid/framing/SequenceNumber.h"
++       #include "qpid/log/Statement.h"   // MDEBUG
+ #include <map>
+ #include <string>
+ 
+@@ -56,6 +57,11 @@
+     void foreach(Functor);
+     virtual void removeIf(Predicate);
+ 
++    virtual void getIds ( IdVector & ) { }
++    virtual void getHeader ( MessageId, types::Variant::Map & /*resultMap*/ ) { QPID_LOG ( critical, "MDEBUG: MessageMap::getHeader"); }
++    virtual void getBody ( MessageId, std::string & ) { QPID_LOG ( critical, "MDEBUG: MessageMap::getBody"); }
++
++
+   protected:
+     typedef std::map<std::string, QueuedMessage> Index;
+     typedef std::map<framing::SequenceNumber, QueuedMessage> Ordering;
+Index: cpp/src/qpid/broker/Queue.h
+===================================================================
+--- cpp/src/qpid/broker/Queue.h	(revision 1151531)
++++ cpp/src/qpid/broker/Queue.h	(working copy)
+@@ -385,6 +385,11 @@
+ 
+     uint32_t getDequeueSincePurge() { return dequeueSincePurge.get(); }
+     void setDequeueSincePurge(uint32_t value);
++
++    void getIds ( IdVector & );
++    void getHeader ( MessageId, types::Variant::Map & resultMap );
++    void getBody ( MessageId, std::string & );
++    void removeMessage ( MessageId );
+ };
+ }
+ }
+Index: cpp/src/qpid/broker/Connection.cpp
+===================================================================
+--- cpp/src/qpid/broker/Connection.cpp	(revision 1151531)
++++ cpp/src/qpid/broker/Connection.cpp	(working copy)
+@@ -34,6 +34,7 @@
+ #include "qpid/framing/MessageTransferBody.h"
+ #include "qmf/org/apache/qpid/broker/EventClientConnect.h"
+ #include "qmf/org/apache/qpid/broker/EventClientDisconnect.h"
++#include "qmf/org/apache/qpid/broker/ArgsConnectionGetSaslData.h"
+ 
+ #include <boost/bind.hpp>
+ #include <boost/ptr_container/ptr_vector.hpp>
+@@ -100,7 +101,9 @@
+     errorListener(0),
+     objectId(objectId_),
+     shadow(shadow_),
+-    outboundTracker(*this)
++    outboundTracker(*this),
++    ssf(0),
++    mech("none")
+ {
+     outboundTracker.wrap(out);
+     if (isLink)
+@@ -395,7 +398,7 @@
+     return (ManagementObject*) mgmtObject;
+ }
+ 
+-Manageable::status_t Connection::ManagementMethod(uint32_t methodId, Args&, string&)
++Manageable::status_t Connection::ManagementMethod(uint32_t methodId, Args& args, string&)
+ {
+     Manageable::status_t status = Manageable::STATUS_UNKNOWN_METHOD;
+ 
+@@ -409,6 +412,12 @@
+         out.activateOutput();
+         status = Manageable::STATUS_OK;
+         break;
++    case _qmf::Connection::METHOD_GETSASLDATA :
++        status = Manageable::STATUS_OK;
++        _qmf::ArgsConnectionGetSaslData& saslDataArgs = (_qmf::ArgsConnectionGetSaslData&) args;
++        saslDataArgs.o_mech = getMech();
++        saslDataArgs.o_ssf  = getSsf();
++        break;
+     }
+ 
+     return status;
+Index: cpp/src/qpid/broker/PriorityQueue.cpp
+===================================================================
+--- cpp/src/qpid/broker/PriorityQueue.cpp	(revision 1151531)
++++ cpp/src/qpid/broker/PriorityQueue.cpp	(working copy)
+@@ -22,6 +22,9 @@
+ #include "qpid/broker/Queue.h"
+ #include "qpid/broker/QueuedMessage.h"
+ #include "qpid/framing/reply_exceptions.h"
++#include "qpid/framing/AMQHeaderBody.h"
++#include "qpid/types/Variant.h"
++
+ #include <cmath>
+ 
+ namespace qpid {
+@@ -209,4 +212,101 @@
+     else return 0;
+ }
+ 
++void PriorityQueue::getIds ( IdVector & v ) {
++    for ( PriorityLevels::iterator p = messages.begin(); p != messages.end(); ++ p ) {
++        for ( Deque::iterator m = p->begin(); m != p->end(); ++ m ) {
++            v.push_back ( m->getId() );
++            QPID_LOG ( critical, "MDEBUG: PriorityQueue::getIds " << m->getId() << " " << m->payload->getCommandId() );
++        }
++    }
++}
++
++void PriorityQueue::getHeader ( MessageId targetId, types::Variant::Map & resultMap ) {
++    for ( PriorityLevels::iterator p = messages.begin(); p != messages.end(); ++ p ) {
++        for ( Deque::iterator m = p->begin(); m != p->end(); ++ m ) {
++            if ( targetId == m->getId() ) {
++
++                // -------------     MessageProperties     -------------
++                const framing::MessageProperties* mProps =
++                m->payload->getFrames().getHeaders()->get<framing::MessageProperties>();
++
++                std::string s;
++                uint i;
++
++                s = mProps->hasContentType() ? mProps->getContentType() : "none";
++                resultMap["ContentType"] = s;
++
++                i = mProps->hasContentLength() ? mProps->getContentLength() : 0;
++                resultMap["ContentLength"] = i;
++
++                s = mProps->hasMessageId() ? mProps->getMessageId().str() : "none";
++                resultMap["MessageId"] = s;
++
++                s = mProps->hasCorrelationId() ? mProps->getCorrelationId() : "none";
++                resultMap["CorrelationId"] = s;
++
++                s = mProps->hasContentEncoding() ? mProps->getContentEncoding() : "none";
++                resultMap["ContentEncoding"] = s;
++
++                s = mProps->hasUserId() ? mProps->getUserId() : "none";
++                resultMap["UserId"] = s;
++
++                s = mProps->hasAppId() ? mProps->getAppId() : "none";
++                resultMap["AppId"] = s;
++
++                // -------------     DeliveryProperties     -------------
++                const framing::DeliveryProperties* dProps =
++                m->payload->getFrames().getHeaders()->get<framing::DeliveryProperties>();
++
++                resultMap["DiscardUnroutable"] = dProps->getDiscardUnroutable();
++                resultMap["Immediate"] = dProps->getImmediate();
++                resultMap["Redelivered"] = dProps->getRedelivered();
++
++                i = dProps->hasPriority() ? dProps->getPriority() : 0;
++                resultMap["Priority"] = i;
++
++                i = dProps->hasDeliveryMode() ? dProps->getDeliveryMode() : 0;
++                resultMap["DeliveryMode"] = i;
++
++                i = dProps->hasTtl() ? dProps->getTtl() : 0;
++                resultMap["Ttl"] = i;
++
++                i = dProps->hasTimestamp() ? dProps->getTimestamp() : 0;
++                resultMap["TimeStamp"] = i;
++
++                i = dProps->hasExpiration() ? dProps->getExpiration() : 0;
++                resultMap["Expiration"] = i;
++
++                s = dProps->hasExchange() ? dProps->getExchange() : "none";
++                resultMap["Exchange"] = s;
++
++                s = dProps->hasRoutingKey() ? dProps->getRoutingKey() : "none";
++                resultMap["RoutingKey"] = s;
++
++                s = dProps->hasResumeId() ? dProps->getResumeId() : "none";
++                resultMap["ResumeId"] = s;
++
++                i = dProps->hasResumeTtl() ? dProps->getResumeTtl() : 0;
++                resultMap["ResumeTtl"] = i;
++
++                return;
++            }
++        }
++
++        resultMap["error"] = types::Variant("message id not found");
++    }
++}
++
++void PriorityQueue::getBody ( MessageId targetId, std::string & body ) {
++    for ( PriorityLevels::iterator p = messages.begin(); p != messages.end(); ++ p ) {
++        for ( Deque::iterator m = p->begin(); m != p->end(); ++ m ) {
++            if ( targetId == m->getId() ) {
++                m->payload->getFrames().getContent ( body );
++                return;
++            }
++        }
++    }
++    body = "none";
++}
++
+ }} // namespace qpid::broker
+Index: cpp/src/qpid/broker/Message.h
+===================================================================
+--- cpp/src/qpid/broker/Message.h	(revision 1151531)
++++ cpp/src/qpid/broker/Message.h	(working copy)
+@@ -70,6 +70,8 @@
+ 
+     const framing::SequenceNumber& getCommandId() { return frames.getId(); }
+ 
++    uint32_t getId() { return frames.getId().getValue(); }
++
+     QPID_BROKER_EXTERN uint64_t contentSize() const;
+ 
+     QPID_BROKER_EXTERN std::string getRoutingKey() const;
+Index: cpp/src/qpid/broker/SaslAuthenticator.cpp
+===================================================================
+--- cpp/src/qpid/broker/SaslAuthenticator.cpp	(revision 1151531)
++++ cpp/src/qpid/broker/SaslAuthenticator.cpp	(working copy)
+@@ -381,7 +381,8 @@
+     const char *challenge;
+     unsigned int challenge_len;
+     
+-    QPID_LOG(debug, "SASL: Starting authentication with mechanism: " << mechanism);
++    QPID_LOG(info, "SASL: Starting authentication with mechanism: " << mechanism);
++    connection.setMech ( mechanism );
+     int code = sasl_server_start(sasl_conn,
+                                  mechanism.c_str(),
+                                  response.c_str(), response.length(),
+@@ -459,6 +460,7 @@
+     if (ssf) {
+         securityLayer = std::auto_ptr<SecurityLayer>(new CyrusSecurityLayer(sasl_conn, maxFrameSize));
+     }
++    connection.setSsf ( ssf );
+     return securityLayer;
+ }
+ 
+Index: cpp/src/qpid/management/ManagementAgent.cpp
+===================================================================
+--- cpp/src/qpid/management/ManagementAgent.cpp	(revision 1151531)
++++ cpp/src/qpid/management/ManagementAgent.cpp	(working copy)
+@@ -1893,7 +1893,7 @@
+     Variant::Map headers;
+ 
+     MapCodec::decode(body, inMap);
+-    QPID_LOG(debug, "RECV GetQuery (v2): map=" << inMap << " seq=" << cid);
++    QPID_LOG(critical, "RECV GetQuery (v2): map=" << inMap << " seq=" << cid);
+ 
+     headers["method"] = "response";
+     headers["qmf.opcode"] = "_query_response";
+@@ -1914,6 +1914,10 @@
+         return;
+     }
+ 
++    if (i->second.asString() == "SCHEMA_ID") {
++        sendExceptionLH(rte, rtk, cid, "Query for _what => '" + i->second.asString() + "' COMING SOON");
++    }
++    else
+     if (i->second.asString() != "OBJECT") {
+         sendExceptionLH(rte, rtk, cid, "Query for _what => '" + i->second.asString() + "' not supported");
+         return;
+Index: specs/management-schema.xml
+===================================================================
+--- specs/management-schema.xml	(revision 1151531)
++++ specs/management-schema.xml	(working copy)
+@@ -94,6 +94,28 @@
+       <arg name="qty"               dir="I" type="uint32" desc="# of messages to move. 0 means all messages"/>
+     </method>
+ 
++    <method name="queueGetIdList" desc="Get a list of IDs for all messages on a queue.">
++      <arg name="name" dir="I" type="lstr" desc="queue name"/>
++      <arg name="list" dir="O" type="list" desc="list of messages"/>
++    </method>
++
++    <method name="queueGetMessageHeader" desc="Get the header from the message with the given ID">
++      <arg name="name" dir="I" type="lstr"   desc="queue name"/>
++      <arg name="id"   dir="I" type="uint32" desc="message id"/>
++      <arg name="map"  dir="O" type="map"    desc="Header data field map"/>
++    </method>
++
++    <method name="queueGetMessageBody" desc="Get the body of the message with the given ID">
++      <arg name="name" dir="I" type="lstr"   desc="queue name"/>
++      <arg name="id"   dir="I" type="uint32" desc="message id"/>
++      <arg name="body" dir="O" type="lstr"   desc="message content"/>
++    </method>
++
++    <method name="queueRemoveMessage" desc="Remove from the queue the message with the given ID">
++      <arg name="name" dir="I" type="lstr"   desc="queue name"/>
++      <arg name="id"   dir="I" type="uint32" desc="message id"/>
++    </method>
++
+     <method name="setLogLevel" desc="Set the log level">
+       <arg name="level"     dir="I" type="sstr"/>
+     </method>
+@@ -115,6 +137,10 @@
+       <arg name="options" dir="I" type="map" desc="Type specific object options for deletion"/> 
+     </method>
+ 
++    <method name="traceMessages" desc="Turn detection of trace messages on or off.">
++      <arg name="setting"       dir="I" type="bool"/>
++    </method>
++
+   </class>
+ 
+   <!--
+@@ -187,6 +213,25 @@
+       <arg name="useAltExchange" dir="I" type="bool"   desc="Iff true, use the queue's configured alternate exchange; iff false, use exchange named in the 'exchange' argument"/>
+       <arg name="exchange"       dir="I" type="sstr"   desc="Name of the exchange to route the messages through"/>
+     </method>
++
++    <method name="getIdList" desc="Get a list of IDs for all messages on a queue">
++      <arg name="list"        dir="O" type="list" desc="list of messages"/>
++    </method>
++
++    <method name="getHeader" desc="Get the header from the message with the given ID">
++      <arg name="id"        dir="I" type="uint32" desc="message id"/>
++      <arg name="map" dir="O" type="map" desc="Header data field map"/>
++    </method>
++
++    <method name="getBody" desc="Get the body of the message with the given ID">
++      <arg name="id"  dir="I" type="uint32" desc="message id"/>
++      <arg name="body" dir="O" type="lstr" desc="message content"/>
++    </method>
++
++    <method name="remove" desc="Remove from the queue the message with the given ID">
++      <arg name="id"  dir="I" type="uint32" desc="message id"/>
++    </method>
++
+   </class>
+ 
+   <!--
+@@ -271,6 +316,10 @@
+     <statistic name="msgsToClient"    type="count64"/>
+ 
+     <method name="close"/> 
++    <method name="getSaslData" desc="Retrieve the Connection's current SASL mechanism and Security Strength Factor">
++      <arg name="mech" dir="O" type="sstr"   desc="current SASL mechanism"/>
++      <arg name="ssf"  dir="O" type="uint32" desc="current SASL Security Strength Factor"/>
++    </method>
+   </class>
+ 
+   <!--
