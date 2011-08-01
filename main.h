@@ -49,12 +49,12 @@ public slots:
     void toggleQueueToolbar(bool);
     void toggleMessageToolbar(bool);
     void queuesAdded();
-    void showBody(const QModelIndex&, const qmf::ConsoleEvent&, const qpid::types::Variant::Map&);
     void headerCtxMenu(const QPoint&);
     void messageDelete();
     void queuePurge(uint);
     void getHeaderIds();
     void messageRemoved(const qmf::ConsoleEvent& event, const qpid::types::Variant::Map& callArgs);
+    void gotBody(const qmf::ConsoleEvent &event, const qpid::types::Variant::Map &args, const QModelIndex& index);
 
 private:
     typedef enum { REFRESH_NORMAL, REFRESH_PAUSED, REFRESH_STOPPED } RefreshState;

@@ -201,11 +201,12 @@ void QmfThread::run()
 void QmfThread::addCallback(qmf::Agent agent, const std::string& method,
                             const qpid::types::Variant::Map& args,
                             const qmf::DataAddr& dataAddr,
-                            const std::string &signal)
+                            const std::string &signal,
+                            const QModelIndex& index)
 {
     QMutexLocker locker(&lock);
 
-    callback_queue.push_back(Callback(signal, args));
+    callback_queue.push_back(Callback(signal, args, index));
     callback_queue.back().correlator = agent.callMethodAsync(method, args, dataAddr);
 
     cond.wakeOne();
@@ -223,7 +224,7 @@ void QmfThread::callCallback(const qmf::ConsoleEvent& event)
                             iter != callback_queue.end(); iter++) {
         const Callback& cb(*iter);
         if (cb.correlator == correlator) {
-            emitCallback(cb.method, event, cb.args);
+            emitCallback(cb, event);
             callback_queue.erase(iter);
             break;
         }
@@ -233,12 +234,14 @@ void QmfThread::callCallback(const qmf::ConsoleEvent& event)
 
 // Resolve the association between the method string stored in the callback_queue
 // and a signal function.
-void QmfThread::emitCallback(const std::string& method, const qmf::ConsoleEvent& event, const qpid::types::Variant::Map& args)
+void QmfThread::emitCallback(const Callback& cb, const qmf::ConsoleEvent& event)
 {
-    if (method == SIGNAL(gotMessageHeaders(const qmf::ConsoleEvent&))) {
-        emit gotMessageHeaders(event, args);
-    } else if (method == SIGNAL(removedMessage(const qmf::ConsoleEvent&))) {
-        emit removedMessage(event, args);
+    if (cb.method == SIGNAL(gotMessageHeaders())) {
+        emit gotMessageHeaders(event, cb.args);
+    } else if (cb.method == SIGNAL(gotMessageBody())) {
+        emit gotMessageBody(event, cb.args, cb.index);
+    } else if (cb.method == SIGNAL(removedMessage())) {
+        emit removedMessage(event, cb.args);
     }
 }
 
@@ -270,7 +273,7 @@ void QmfThread::getQueueHeaders(const QString& name)
                 // submit an asyncronous call to get the header
                 // and request that the gotMessageHeaders signal be emitted when ready
                 addCallback(agent, "queueGetMessageHeader", callMap, brokerData.getAddr(),
-                            SIGNAL(gotMessageHeaders(const qmf::ConsoleEvent&)));
+                            SIGNAL(gotMessageHeaders()));
             }
         }
     }
@@ -283,8 +286,31 @@ void QmfThread::queueRemoveMessage(const QString& name, const qpid::types::Varia
     // submit an asyncronous call to remove the message
     // and request that the removedMessage signal be emitted when ready
     addCallback(agent, "queueRemoveMessage", args, brokerData.getAddr(),
-                SIGNAL(removedMessage(const qmf::ConsoleEvent&)));
+                SIGNAL(removedMessage()));
 }
+
+// SLOT: Show the current message body
+void QmfThread::showBody(const QModelIndex& index, const qmf::ConsoleEvent &event, const qpid::types::Variant::Map &args)
+{
+    qmf::Agent agent = brokerData.getAgent();
+
+    // get the expected body content type
+    const qpid::types::Variant::Map& headerMap(event.getArguments());
+    qpid::types::Variant::Map::const_iterator iter = headerMap.begin();
+    const qpid::types::Variant::Map& headerAttributes(iter->second.asMap());
+    iter = headerAttributes.find("ContentType");
+    if (iter != headerAttributes.end()) {
+        std::string contentType = iter->second.asString();
+
+        qpid::types::Variant::Map map(args);
+        // remember the content type so we can decode the response properly
+        map["ContentType"] = contentType;
+        // make the call
+        addCallback(agent, "queueGetMessageBody", map, brokerData.getAddr(),
+                    SIGNAL(gotMessageBody()), index);
+    }
+}
+
 
 void QmfThread::pauseRefreshes(bool checked)
 {

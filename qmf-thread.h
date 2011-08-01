@@ -34,6 +34,7 @@
 #include <sstream>
 #include <deque>
 
+static QModelIndex defaultIndex;
 class QmfThread : public QThread {
     Q_OBJECT
 
@@ -49,6 +50,8 @@ public slots:
     void disconnect();
     void connect_url(const QString&, const QString&, const QString&);
     void pauseRefreshes(bool);
+    void showBody(const QModelIndex&, const qmf::ConsoleEvent &, const qpid::types::Variant::Map &);
+
 
 signals:
     void connectionStatusChanged(const QString&);
@@ -57,6 +60,7 @@ signals:
     void queuesAdded();
     void headerAdded(uint);
     void gotMessageHeaders(const qmf::ConsoleEvent&, const qpid::types::Variant::Map&);
+    void gotMessageBody(const qmf::ConsoleEvent&, const qpid::types::Variant::Map&, const QModelIndex&);
     void removedMessage(const qmf::ConsoleEvent&, const qpid::types::Variant::Map&);
 
     void qmfError(const QString&);
@@ -89,8 +93,10 @@ private:
         uint32_t correlator;
         std::string method;
         qpid::types::Variant::Map args;
+        QModelIndex index;
 
-        Callback(std::string _m, const qpid::types::Variant::Map& _a) : correlator(0), method(_m), args(_a) {}
+        Callback(std::string _m, const qpid::types::Variant::Map& _a, const QModelIndex& _i) : correlator(0),
+            method(_m), args(_a), index(_i) {}
     };
 
     typedef std::deque<Callback> callback_queue_t;
@@ -98,11 +104,12 @@ private:
     callback_queue_t callback_queue;
 
     void callCallback(const qmf::ConsoleEvent&);
-    void emitCallback(const std::string&, const qmf::ConsoleEvent&, const qpid::types::Variant::Map&);
+    void emitCallback(const Callback& cb, const qmf::ConsoleEvent& event);
     void addCallback(qmf::Agent, const std::string&,
                                 const qpid::types::Variant::Map&,
                                 const qmf::DataAddr&,
-                                const std::string&);
+                                const std::string&,
+                                const QModelIndex& = defaultIndex);
 
     // remember the broker object so we can make qmf calls
     qmf::Data brokerData;

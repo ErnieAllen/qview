@@ -141,10 +141,10 @@ QView::QView(QMainWindow* parent) : QMainWindow(parent)
 
 
     // Show the message body when we click on a NODE_BODY row in the header tree
-    //connect(treeView_objects, SIGNAL(clicked(QModelIndex)), headerModel, SLOT(selected(QModelIndex)));
     connect(treeView_objects, SIGNAL(expanded(QModelIndex)), headerModel, SLOT(selected(QModelIndex)));
 
-    connect(headerModel, SIGNAL(bodySelected(QModelIndex, qmf::ConsoleEvent,qpid::types::Variant::Map)), this, SLOT(showBody(QModelIndex, qmf::ConsoleEvent,qpid::types::Variant::Map)));
+    connect(headerModel, SIGNAL(bodySelected(QModelIndex, qmf::ConsoleEvent,qpid::types::Variant::Map)), qmf, SLOT(showBody(QModelIndex,qmf::ConsoleEvent,qpid::types::Variant::Map)));
+    connect(qmf, SIGNAL(gotMessageBody(qmf::ConsoleEvent,qpid::types::Variant::Map,QModelIndex)), this, SLOT(gotBody(qmf::ConsoleEvent,qpid::types::Variant::Map,QModelIndex)));
     //connect(headerModel, SIGNAL(summarySelected(QModelIndex)), treeView_objects, SLOT(expand(QModelIndex)));
 
     //
@@ -354,22 +354,14 @@ void QView::showPurge()
 }
 
 // SLOT: Show the current message body
-void QView::showBody(const QModelIndex& index, const qmf::ConsoleEvent &event, const qpid::types::Variant::Map &id)
+void QView::gotBody(const qmf::ConsoleEvent &event, const qpid::types::Variant::Map &args, const QModelIndex& index)
 {
     QString body;
-    qmf::Agent agent = tableView_object->selectedQueueAgent(queueModel, queueProxyModel);
-    const qmf::DataAddr& dataAddr = tableView_object->selectedQueueDataAddr(queueModel, queueProxyModel);
-    const qpid::types::Variant::Map& headerMap(event.getArguments());
-
-    qpid::types::Variant::Map::const_iterator iter = headerMap.begin();
-    const qpid::types::Variant::Map& headerAttributes(iter->second.asMap());
-
-    iter = headerAttributes.find("ContentType");
-    if (iter != headerAttributes.end()) {
+    qpid::types::Variant::Map::const_iterator iter = args.find("ContentType");
+    if (iter != args.end()) {
         std::string contentType = iter->second.asString();
 
-        qmf::ConsoleEvent cevent = agent.callMethod("getBody", id, dataAddr);
-        const qpid::types::Variant::Map& results(cevent.getArguments());
+        const qpid::types::Variant::Map& results(event.getArguments());
         iter = results.find("body");
         if (iter != results.end()) {
             if (contentType == "amqp/map") {
@@ -395,6 +387,7 @@ void QView::showBody(const QModelIndex& index, const qmf::ConsoleEvent &event, c
             headerModel->setBodyText(index, body);
         }
     }
+
 }
 
 // The purge dialog was accepted. Send the request and update the display
