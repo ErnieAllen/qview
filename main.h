@@ -40,6 +40,8 @@ public:
 
     QLabel *label_connection_prompt;
     QLabel *label_connection_status;
+    QLabel *label_exception_prompt;
+    QLabel *label_exception_status;
 
 public slots:
     void queueSelected();
@@ -55,6 +57,8 @@ public slots:
     void getHeaderIds();
     void messageRemoved(const qmf::ConsoleEvent& event, const qpid::types::Variant::Map& callArgs);
     void gotBody(const qmf::ConsoleEvent &event, const qpid::types::Variant::Map &args, const QModelIndex& index);
+    void qmfException(const QString&);
+    void qmfExceptionClear();
 
 private:
     typedef enum { REFRESH_NORMAL, REFRESH_PAUSED, REFRESH_STOPPED } RefreshState;

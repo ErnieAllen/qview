@@ -140,6 +140,9 @@ QView::QView(QMainWindow* parent) : QMainWindow(parent)
     connect(queueModel, SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(getHeaderIds()));
 
 
+    // Show the last qmf exception
+    connect(qmf, SIGNAL(qmfError(QString)), this, SLOT(qmfException(QString)));
+
     // Show the message body when we click on a NODE_BODY row in the header tree
     connect(treeView_objects, SIGNAL(expanded(QModelIndex)), headerModel, SLOT(selected(QModelIndex)));
 
@@ -158,6 +161,7 @@ QView::QView(QMainWindow* parent) : QMainWindow(parent)
     connect(qmf, SIGNAL(isConnected(bool)), queueToolBar,            SLOT(setEnabled(bool)));
     connect(qmf, SIGNAL(isConnected(bool)), messageToolBar,          SLOT(setEnabled(bool)));
     connect(qmf, SIGNAL(isConnected(bool)), headerModel,             SLOT(clear()));
+    connect(qmf, SIGNAL(isConnected(bool)), this,                    SLOT(qmfExceptionClear()));
 
     // restore the state of all widgets. should be done after all widgets
     // are created and initialized
@@ -172,9 +176,12 @@ void QView::setupStatusBar() {
     statusBar()->addWidget(label_connection_prompt);
     statusBar()->addWidget(label_connection_status);
 
-    //refreshButton = new QToolButton();
-    //refreshButton->setIcon();
     QToolBar* refreshToolbar = new QToolBar(tr("Page refresh"));
+    label_exception_prompt = new QLabel(QString(tr("Last Exception: ")));
+    label_exception_status = new QLabel();
+
+    refreshToolbar->addWidget(label_exception_prompt);
+    refreshToolbar->addWidget(label_exception_status);
     refreshToolbar->addAction(actionRefresh);
     statusBar()->addPermanentWidget(refreshToolbar);
 }
@@ -437,6 +444,20 @@ void QView::toggleQueueToolbar(bool on) {
         queueToolBar->hide();
     }
     actionQueue_toolbar->setChecked(on);
+}
+
+// SLOT: Show the qmf exception that just happened
+void QView::qmfException(const QString &exception)
+{
+    label_exception_status->setText(exception);
+    label_exception_status->setStyleSheet("color: red; font-weight:bold; padding-right:1em;");
+}
+
+// SLOT: Reset the qmf exception status
+void QView::qmfExceptionClear()
+{
+    label_exception_status->setText(tr("None"));
+    label_exception_status->setStyleSheet("color: green; padding-right:1em;");
 }
 
 QView::~QView()
