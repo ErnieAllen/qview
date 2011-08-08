@@ -202,3 +202,17 @@ QString QueueTableModel::selectedQueueName(const QModelIndex& selectedIndex)
         return QString(iter->second.asString().c_str());
 
 }
+
+QVariant QueueTableModel::selectedQueueDepth(const QModelIndex& selectedIndex)
+{
+    qpid::types::Variant::Map::const_iterator iter;
+    const qmf::Data& object = dataList.at(selectedIndex.row());
+    const qpid::types::Variant::Map& attrs(object.getProperties());
+
+    iter = attrs.find("msgDepth");
+    if (iter == attrs.end())
+        return QVariant(0);
+    else
+        return QVariant(iter->second.asUint32());
+}
+

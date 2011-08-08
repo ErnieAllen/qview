@@ -17,32 +17,21 @@
  * under the License.
  */
 
-#ifndef QUEUETABLEVIEW_H
-#define QUEUETABLEVIEW_H
+#ifndef COPYQUEUE_H
+#define COPYQUEUE_H
 
-#include <QTableView>
-#include <QSortFilterProxyModel>
-#include "model-queue.h"
+#include <QObject>
 
-class QueueTableView : public QTableView
+class CopyQueue : public QObject
 {
     Q_OBJECT
 public:
-    explicit QueueTableView(QWidget *parent = 0);
-
-    QString                 selectedQueueName(QueueTableModel *, QSortFilterProxyModel *);
-    const qmf::Agent&       selectedQueueAgent(QueueTableModel *model, QSortFilterProxyModel *);
-    const qmf::DataAddr&    selectedQueueDataAddr(QueueTableModel *model, QSortFilterProxyModel *);
-    QVariant                selectedQueueDepth(QueueTableModel *, QSortFilterProxyModel *);
-
-    bool                    hasSelected();
+    explicit CopyQueue(QObject *parent = 0);
 
 signals:
 
 public slots:
 
-protected:
-
 };
 
-#endif // QUEUETABLEVIEW_H
+#endif // COPYQUEUE_H

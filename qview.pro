@@ -16,7 +16,9 @@ SOURCES += main.cpp\
     dialogopen.cpp \
     dialogabout.cpp \
     dialogpurge.cpp \
-    queuetableview.cpp
+    queuetableview.cpp \
+    dialogcopy.cpp \
+    copyqueue.cpp
 
 HEADERS  += \
     main.h \
@@ -26,13 +28,16 @@ HEADERS  += \
     dialogopen.h \
     dialogabout.h \
     dialogpurge.h \
-    queuetableview.h
+    queuetableview.h \
+    dialogcopy.h \
+    copyqueue.h
 
 FORMS    += \
     qview_main.ui \
     dialogopen.ui \
     dialogabout.ui \
-    dialogpurge.ui
+    dialogpurge.ui \
+    dialogcopy.ui
 
 OTHER_FILES += \
     license.txt \

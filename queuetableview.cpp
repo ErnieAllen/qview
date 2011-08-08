@@ -53,3 +53,13 @@ const qmf::DataAddr& QueueTableView::selectedQueueDataAddr(QueueTableModel *mode
     QModelIndex sindex = proxy->mapToSource(index);
     return model->selectedQueueDataAddr(sindex);
 }
+
+QVariant QueueTableView::selectedQueueDepth(QueueTableModel *model, QSortFilterProxyModel *proxy)
+{
+    QModelIndex index = currentIndex();
+    if (index.isValid()) {
+        QModelIndex sindex = proxy->mapToSource(index);
+        return model->selectedQueueDepth(sindex);
+    }
+    return QVariant();
+}

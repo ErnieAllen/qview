@@ -42,6 +42,7 @@ public:
     const qmf::Agent&       selectedQueueAgent(const QModelIndex&);
     const qmf::DataAddr&    selectedQueueDataAddr(const QModelIndex&);
     QString                 selectedQueueName(const QModelIndex&);
+    QVariant                selectedQueueDepth(const QModelIndex&);
 
 public slots:
     void addObject(const qmf::Data&);

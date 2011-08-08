@@ -17,32 +17,34 @@
  * under the License.
  */
 
-#ifndef QUEUETABLEVIEW_H
-#define QUEUETABLEVIEW_H
+#ifndef DIALOGCOPY_H
+#define DIALOGCOPY_H
 
-#include <QTableView>
-#include <QSortFilterProxyModel>
-#include "model-queue.h"
+#include <QDialog>
 
-class QueueTableView : public QTableView
+namespace Ui {
+    class DialogCopy;
+}
+
+class DialogCopy : public QDialog
 {
     Q_OBJECT
+
 public:
-    explicit QueueTableView(QWidget *parent = 0);
-
-    QString                 selectedQueueName(QueueTableModel *, QSortFilterProxyModel *);
-    const qmf::Agent&       selectedQueueAgent(QueueTableModel *model, QSortFilterProxyModel *);
-    const qmf::DataAddr&    selectedQueueDataAddr(QueueTableModel *model, QSortFilterProxyModel *);
-    QVariant                selectedQueueDepth(QueueTableModel *, QSortFilterProxyModel *);
-
-    bool                    hasSelected();
-
-signals:
+    explicit DialogCopy(QWidget *parent = 0);
+    ~DialogCopy();
 
 public slots:
+    void accept();
+    void browse();
+    void copyToFileToggled(bool);
 
-protected:
+signals:
+    void copyDialogAccepted(const QString&);
 
+private:
+    Ui::DialogCopy *ui;
+    void showEvent(QShowEvent *);
 };
 
-#endif // QUEUETABLEVIEW_H
+#endif // DIALOGCOPY_H

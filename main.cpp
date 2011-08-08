@@ -111,6 +111,9 @@ QView::QView(QMainWindow* parent) : QMainWindow(parent)
     purgeDialog = new DialogPurge(this);
     connect(purgeDialog, SIGNAL(purgeDialogAccepted(uint)), this, SLOT(queuePurge(uint)));
 
+    copyDialog = new DialogCopy(this);
+    connect(copyDialog, SIGNAL(copyDialogAccepted(QString)), this, SLOT(queueCopy(QString)));
+
     //
     // Linkage for the menu and the Connection Status label.
     //
@@ -218,6 +221,7 @@ void QView::createToolBars()
     messageToolBar->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
 
     connect(actionPurge, SIGNAL(triggered()), this, SLOT(showPurge()));
+    connect(actionCopy_Messages, SIGNAL(triggered()), this, SLOT(showCopy()));
 }
 
 // process command line arguments
@@ -325,6 +329,11 @@ void QView::queuesAdded()
         // and adjust the size of the name column
         tableView_object->resizeColumnToContents(0);
     }
+    QVariant depth = tableView_object->selectedQueueDepth(queueModel, queueProxyModel);
+    if (depth.toInt() > 0)
+        actionCopy_Messages->setEnabled(true);
+    else
+        actionCopy_Messages->setEnabled(false);
 }
 
 // SLOT: called when a queue is highlighted (mouse or keyboard)
@@ -357,6 +366,16 @@ void QView::showPurge()
     if (!name.isEmpty()) {
         purgeDialog->setQueueName(name);
         purgeDialog->show();
+    }
+}
+
+// SLOT: Show the copy dialog box
+void QView::showCopy()
+{
+    QString name = tableView_object->selectedQueueName(queueModel, queueProxyModel);
+    if (!name.isEmpty()) {
+        //copyDialog->setQueueName(name);
+        copyDialog->show();
     }
 }
 
@@ -397,7 +416,7 @@ void QView::gotBody(const qmf::ConsoleEvent &event, const qpid::types::Variant::
 
 }
 
-// The purge dialog was accepted. Send the request and update the display
+// SLOT: The purge dialog was accepted. Send the request and update the display
 void QView::queuePurge(uint count)
 {
     if (tableView_object->hasSelected()) {
@@ -414,6 +433,13 @@ void QView::queuePurge(uint count)
         headerModel->clear();
         getHeaderIds();
     }
+}
+
+// SLOT: The copy dialog was accepted. Copy the message headers/body
+void QView::queueCopy(const QString& file)
+{
+    QString f = file;
+
 }
 
 // SLOT: Show/Hide the Connection toolbar
@@ -474,6 +500,8 @@ QView::~QView()
         delete openDialog;
     if (purgeDialog)
         delete purgeDialog;
+    if (copyDialog)
+        delete copyDialog;
     delete headerPopupMenu;
 }
 

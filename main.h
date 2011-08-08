@@ -24,6 +24,7 @@
 #include "dialogopen.h"
 #include "dialogabout.h"
 #include "dialogpurge.h"
+#include "dialogcopy.h"
 #include "qmf-thread.h"
 #include "model-header.h"
 #include "model-queue.h"
@@ -47,6 +48,7 @@ public slots:
     void queueSelected();
     void showAbout();
     void showPurge();
+    void showCopy();
     void toggleConnectionToolbar(bool);
     void toggleQueueToolbar(bool);
     void toggleMessageToolbar(bool);
@@ -54,6 +56,7 @@ public slots:
     void headerCtxMenu(const QPoint&);
     void messageDelete();
     void queuePurge(uint);
+    void queueCopy(const QString&);
     void getHeaderIds();
     void messageRemoved(const qmf::ConsoleEvent& event, const qpid::types::Variant::Map& callArgs);
     void gotBody(const qmf::ConsoleEvent &event, const qpid::types::Variant::Map &args, const QModelIndex& index);
@@ -70,8 +73,9 @@ private:
     QSortFilterProxyModel* queueProxyModel;
     QItemSelectionModel* itemSelector;
 
-    DialogOpen* openDialog;
-    DialogPurge* purgeDialog;
+    DialogOpen*     openDialog;
+    DialogPurge*    purgeDialog;
+    DialogCopy*     copyDialog;
 
     void createToolBars();
     void setupStatusBar();
