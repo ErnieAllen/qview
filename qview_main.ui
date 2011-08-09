@@ -338,13 +338,16 @@ p, li { white-space: pre-wrap; }
      <normaloff>:/images/copy.png</normaloff>:/images/copy.png</iconset>
    </property>
    <property name="text">
-    <string>Copy message</string>
+    <string>Export messages</string>
    </property>
    <property name="iconText">
-    <string>Copy</string>
+    <string>Export</string>
+   </property>
+   <property name="toolTip">
+    <string>Export messages</string>
    </property>
    <property name="statusTip">
-    <string>Copy message</string>
+    <string>Export messages</string>
    </property>
   </action>
   <action name="actionTrace_a_Message">

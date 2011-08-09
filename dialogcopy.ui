@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Dialog</string>
+   <string>Export messages</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
@@ -60,7 +60,7 @@ background-color: #ffdddd;</string>
  }</string>
      </property>
      <property name="title">
-      <string>What to copy</string>
+      <string>What to export</string>
      </property>
      <widget class="QRadioButton" name="radioButtonCopyAll">
       <property name="geometry">
@@ -128,7 +128,7 @@ background-color: #ffdddd;</string>
        </rect>
       </property>
       <property name="text">
-       <string>Copy to the clipboard</string>
+       <string>Export to the clipboard</string>
       </property>
       <property name="checked">
        <bool>true</bool>
@@ -144,7 +144,7 @@ background-color: #ffdddd;</string>
        </rect>
       </property>
       <property name="text">
-       <string>Copy to a file</string>
+       <string>Save to a file</string>
       </property>
      </widget>
      <widget class="QLineEdit" name="lineEditCopyFileName">
