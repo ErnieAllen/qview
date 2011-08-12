@@ -56,8 +56,8 @@ public slots:
 signals:
     void connectionStatusChanged(const QString&);
     void isConnected(bool);
-    void addObject(const qmf::Data&);
-    void queuesAdded();
+    void addQueue(const qmf::Data&, uint);
+    void doneAddingQueues(uint);
     void headerAdded(uint);
     void gotMessageHeaders(const qmf::ConsoleEvent&, const qpid::types::Variant::Map&);
     void gotMessageBody(const qmf::ConsoleEvent&, const qpid::types::Variant::Map&, const QModelIndex&);

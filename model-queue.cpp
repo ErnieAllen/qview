@@ -27,41 +27,65 @@ QueueTableModel::QueueTableModel(QObject* parent) : QAbstractTableModel(parent)
 {
     // Initialize the default columns
     queueColumns.append(Column("name", "Name", Qt::AlignLeft, ""));
-    queueColumns.append(Column("durable", "Durable", Qt::AlignLeft, ""));
     queueColumns.append(Column("autoDelete", "Auto Delete", Qt::AlignLeft, ""));
-    queueColumns.append(Column("exclusive", "Exclusive", Qt::AlignLeft, ""));
     queueColumns.append(Column("msgDepth", "Messages", Qt::AlignRight, "N"));
     queueColumns.append(Column("byteDepth", "Bytes", Qt::AlignRight, "N"));
     queueColumns.append(Column("byteTotalEnqueues", "In Bytes", Qt::AlignRight, "N"));
+    queueColumns.append(Column("byteTotalDequeues", "Out Bytes", Qt::AlignRight, "N"));
 }
 
 
-void QueueTableModel::addObject(const qmf::Data& object)
+bool QueueTableModel::isSystemQueue(const qmf::Data& queue)
 {
-    if (!object.isValid())
+    const qpid::types::Variant::Map& map(queue.getProperties());
+    qpid::types::Variant::Map::const_iterator iter;
+    iter = map.find("arguments");
+    if (iter != map.end()) {
+        const qpid::types::Variant::Map& args(iter->second.asMap());
+        iter = args.find("management");
+        if (iter == args.end()) {
+            return false;
+        }
+        return true;
+    }
+
+    return queue.getProperty("exclusive").asBool();
+}
+
+void QueueTableModel::addQueue(const qmf::Data& queue, uint correlator)
+{
+    if (!queue.isValid())
         return;
 
+    // filter out system queues if required
+    if (hideSystemQueues) {
+        if (isSystemQueue(queue))
+            return;
+    }
+
     // see if the object already exists in the list
-    const qpid::types::Variant& name = object.getProperty("name");
+    const qpid::types::Variant& name = queue.getProperty("name");
 
     for (int idx=0; idx<dataList.size(); idx++) {
         qmf::Data existing = dataList.at(idx);
         if (name.isEqualTo(existing.getProperty("name"))) {
-            const qpid::types::Variant::Map& map(object.getProperties());
+
+            //const qpid::types::Variant::Map& map(queue.getProperties());
+            qpid::types::Variant::Map map = qpid::types::Variant::Map(queue.getProperties());
+            map["correlator"] = correlator;
+
             existing.overwriteProperties(map);
-
-            // force a refresh of the changed row
-            QModelIndex topLeft = index(0, 0);
-            QModelIndex bottomRight = index(dataList.size() - 1, 2);
-            emit dataChanged ( topLeft, bottomRight );
-
             return;
         }
     }
 
+    qmf::Data q = qmf::Data(queue);
+    qpid::types::Variant corr =  qpid::types::Variant(correlator);
+    q.setProperty("correlator", corr);
+
     // this is a new queue
     beginInsertRows(QModelIndex(), 0, 0);
-    dataList.append(object);
+    dataList.append(q);
     endInsertRows();
 }
 
@@ -115,8 +139,8 @@ QVariant QueueTableModel::data(const QModelIndex &index, int role) const
     if (role != Qt::DisplayRole)
         return QVariant();
 
-    const qmf::Data& object = dataList.at(index.row());
-    const qpid::types::Variant::Map& attrs(object.getProperties());
+    const qmf::Data& queue = dataList.at(index.row());
+    const qpid::types::Variant::Map& attrs(queue.getProperties());
     qpid::types::Variant::Map::const_iterator iter;
 
     iter = attrs.find(queueColumns[index.column()].name);
@@ -166,7 +190,7 @@ QString QueueTableModel::fmtBytes(const qpid::types::Variant& v) const
 
 QVariant QueueTableModel::headerData(int section, Qt::Orientation orientation, int role) const
 {
-    if (section < queueColumns.size()) {
+    if ((section >=0) && (section < queueColumns.size())) {
 
         if (role == Qt::TextAlignmentRole) {
             return queueColumns[section].alignment;
@@ -191,28 +215,68 @@ const qmf::DataAddr& QueueTableModel::selectedQueueDataAddr(const QModelIndex& s
 
 QString QueueTableModel::selectedQueueName(const QModelIndex& selectedIndex)
 {
-    qpid::types::Variant::Map::const_iterator iter;
-    const qmf::Data& object = dataList.at(selectedIndex.row());
-    const qpid::types::Variant::Map& attrs(object.getProperties());
+    if (selectedIndex.isValid()) {
+        qpid::types::Variant::Map::const_iterator iter;
+        const qmf::Data& queue = dataList.at(selectedIndex.row());
+        const qpid::types::Variant::Map& attrs(queue.getProperties());
 
-    iter = attrs.find("name");
-    if (iter == attrs.end())
-        return QString("unknown");
-    else
-        return QString(iter->second.asString().c_str());
-
+        iter = attrs.find("name");
+        if (iter != attrs.end())
+            return QString(iter->second.asString().c_str());
+    }
+    return QString("unknown");
 }
 
 QVariant QueueTableModel::selectedQueueDepth(const QModelIndex& selectedIndex)
 {
-    qpid::types::Variant::Map::const_iterator iter;
-    const qmf::Data& object = dataList.at(selectedIndex.row());
-    const qpid::types::Variant::Map& attrs(object.getProperties());
+    if (selectedIndex.isValid()) {
+        qpid::types::Variant::Map::const_iterator iter;
+        const qmf::Data& queue = dataList.at(selectedIndex.row());
+        const qpid::types::Variant::Map& attrs(queue.getProperties());
 
-    iter = attrs.find("msgDepth");
-    if (iter == attrs.end())
-        return QVariant(0);
-    else
-        return QVariant(iter->second.asUint32());
+        iter = attrs.find("msgDepth");
+        if (iter != attrs.end())
+            return QVariant(iter->second.asUint32());
+    }
+    return QVariant(0);
 }
 
+void QueueTableModel::toggleSystemQueues(bool show)
+{
+    this->hideSystemQueues = !show;
+    if (!show) {
+
+        // remove the system queues
+        for (int idx=0; idx<dataList.size(); idx++) {
+            if (isSystemQueue(dataList.at(idx))) {
+                beginRemoveRows( QModelIndex(), idx, idx );
+                dataList.removeAt(idx--);
+                endRemoveRows();
+            }
+        }
+
+        // force a refresh of the display
+        QModelIndex topLeft = index(0, 0);
+        QModelIndex bottomRight = index(dataList.size() - 1, 2);
+        emit dataChanged ( topLeft, bottomRight );
+
+    }
+}
+
+void QueueTableModel::refresh(uint correlator)
+{
+    // remove any old queues that were not added/updated with this correlator
+    for (int idx=0; idx<dataList.size(); idx++) {
+        uint corr = dataList.at(idx).getProperty("correlator").asUint32();
+        if (corr != correlator) {
+            beginRemoveRows( QModelIndex(), idx, idx );
+            dataList.removeAt(idx--);
+            endRemoveRows();
+        }
+    }
+
+    // force a refresh of the display
+    QModelIndex topLeft = index(0, 0);
+    QModelIndex bottomRight = index(dataList.size() - 1, 2);
+    emit dataChanged ( topLeft, bottomRight );
+}

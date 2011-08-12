@@ -129,11 +129,8 @@ QView::QView(QMainWindow* parent) : QMainWindow(parent)
     connect(messageToolBar, SIGNAL(visibilityChanged(bool)), this, SLOT(toggleMessageToolbar(bool)));
     connect(queueToolBar, SIGNAL(visibilityChanged(bool)), this, SLOT(toggleQueueToolbar(bool)));
 
-    //
-    // Linkage for Object tab components
-    //
-    connect(qmf, SIGNAL(addObject(qmf::Data)), queueModel, SLOT(addObject(qmf::Data)));
-    connect(qmf, SIGNAL(queuesAdded()), this, SLOT(queuesAdded()));
+    connect(qmf, SIGNAL(addQueue(qmf::Data,uint)), queueModel, SLOT(addQueue(qmf::Data,uint)));
+    connect(qmf, SIGNAL(doneAddingQueues(uint)), this, SLOT(doneAddingQueues(uint)));
     connect(qmf, SIGNAL(gotMessageHeaders(qmf::ConsoleEvent, qpid::types::Variant::Map)), headerModel, SLOT(addHeader(qmf::ConsoleEvent, qpid::types::Variant::Map)));
     connect(qmf, SIGNAL(removedMessage(qmf::ConsoleEvent, qpid::types::Variant::Map)), this, SLOT(messageRemoved(qmf::ConsoleEvent,qpid::types::Variant::Map)));
     connect(actionRefresh, SIGNAL(toggled(bool)), qmf, SLOT(pauseRefreshes(bool)));
@@ -142,6 +139,9 @@ QView::QView(QMainWindow* parent) : QMainWindow(parent)
     // update the list of messages each time the list of queues are updated
     connect(queueModel, SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(getHeaderIds()));
 
+    // Show/Hide the system queues
+    connect(actionShowManagementQueues, SIGNAL(toggled(bool)), queueModel, SLOT(toggleSystemQueues(bool)));
+    queueModel->toggleSystemQueues(actionShowManagementQueues->isChecked());
 
     // Show the last qmf exception
     connect(qmf, SIGNAL(qmfError(QString)), this, SLOT(qmfException(QString)));
@@ -204,8 +204,8 @@ void QView::createToolBars()
     addToolBar(Qt::LeftToolBarArea, queueToolBar);
     queueToolBar->setObjectName("QueueActions");
     queueToolBar->setIconSize(QSize(32,32));
-    queueToolBar->addAction(actionPause);
-    queueToolBar->addAction(actionResume);
+    //queueToolBar->addAction(actionPause);
+    //queueToolBar->addAction(actionResume);
     queueToolBar->setEnabled(false);
     queueToolBar->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
 
@@ -321,7 +321,7 @@ void QView::queueSelected() {
 }
 
 // a batch of queues were just added
-void QView::queuesAdded()
+void QView::doneAddingQueues(uint correlator)
 {
     // The first time queues are added, there is no selection in queue table, so select one
     if (!itemSelector->hasSelection()) {
@@ -329,11 +329,18 @@ void QView::queuesAdded()
         // and adjust the size of the name column
         tableView_object->resizeColumnToContents(0);
     }
+
+/*
+    // If the selected queue has messages, enable the export action
     QVariant depth = tableView_object->selectedQueueDepth(queueModel, queueProxyModel);
     if (depth.toInt() > 0)
         actionCopy_Messages->setEnabled(true);
     else
         actionCopy_Messages->setEnabled(false);
+*/
+
+    // Force a refresh of the queue display to make sure we see the changes
+    queueModel->refresh(correlator);
 }
 
 // SLOT: called when a queue is highlighted (mouse or keyboard)

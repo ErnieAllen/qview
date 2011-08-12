@@ -52,7 +52,7 @@ public slots:
     void toggleConnectionToolbar(bool);
     void toggleQueueToolbar(bool);
     void toggleMessageToolbar(bool);
-    void queuesAdded();
+    void doneAddingQueues(uint);
     void headerCtxMenu(const QPoint&);
     void messageDelete();
     void queuePurge(uint);

@@ -44,10 +44,13 @@ public:
     QString                 selectedQueueName(const QModelIndex&);
     QVariant                selectedQueueDepth(const QModelIndex&);
 
+    void refresh(uint);
+
 public slots:
-    void addObject(const qmf::Data&);
+    void addQueue(const qmf::Data&, uint);
     void connectionChanged(bool isConnected);
     void clear();
+    void toggleSystemQueues(bool);
 
 signals:
 
@@ -72,6 +75,9 @@ private:
     };
     typedef QList<Column> QueueColumnList;
     QueueColumnList queueColumns;
+    bool hideSystemQueues;
+    bool isSystemQueue(const qmf::Data&);
+
 };
 
 

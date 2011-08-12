@@ -189,6 +189,8 @@ p, li { white-space: pre-wrap; }
      <addaction name="actionMessage_toolbar"/>
     </widget>
     <addaction name="menuToolbars"/>
+    <addaction name="separator"/>
+    <addaction name="actionShowManagementQueues"/>
    </widget>
    <widget class="QMenu" name="menuHelp">
     <property name="title">
@@ -418,6 +420,17 @@ p, li { white-space: pre-wrap; }
    </property>
    <property name="toolTip">
     <string>Click to pause page updates</string>
+   </property>
+  </action>
+  <action name="actionShowManagementQueues">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Show management queues</string>
    </property>
   </action>
  </widget>

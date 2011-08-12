@@ -119,74 +119,78 @@ HeaderModel::updateOrInsertNode(IndexList& list, NodeType nodeType, ObjectIndexP
 
 void HeaderModel::addHeader(const qmf::ConsoleEvent& event, const qpid::types::Variant::Map& callArgs)
 {
-    const qpid::types::Variant::Map& args(event.getArguments());
+    // get the messageId that was passed to the qmf call
     std::string messageId;
     qpid::types::Variant::Map::const_iterator iter = callArgs.find("id");
     if (iter != callArgs.end())
         messageId = iter->second.asString();
 
-    for (qpid::types::Variant::Map::const_iterator iter = args.begin();
+    // get the arguments returned in the call results
+    const qpid::types::Variant::Map& args(event.getArguments());
+
+    // loop throught the retuened arguments and add them to the header tree
+    for (iter = args.begin();
        iter != args.end(); iter++) {
 
-           QStringList propList = QStringList();
-           QString summary = QString();
-           QString bodyProps = QString();
-           QString sep(", ");
-           QString equ("=");
+       QStringList propList = QStringList();
+       QString summary = QString();
+       QString bodyProps = QString();
+       QString sep(", ");
+       QString equ("=");
 
-           bool firstSum = true;
-           bool firstBody = true;
+       bool firstSum = true;
+       bool firstBody = true;
 
-           qpid::types::Variant::Map attrs = (iter->second).asMap();
-           // each argument in the map is concatenated
-           for (qpid::types::Variant::Map::const_iterator iter = attrs.begin();
-                iter != attrs.end(); iter++) {
+       qpid::types::Variant::Map attrs = (iter->second).asMap();
+       // each argument in the map is concatenated
+       for (qpid::types::Variant::Map::const_iterator iter = attrs.begin();
+            iter != attrs.end(); iter++) {
 
-                QString name(iter->first.c_str());
-                QString value(iter->second.asString().c_str());
-                if (bodyProperties.contains(name)) {
-                    if (firstBody)
-                        firstBody = false;
-                    else
-                        bodyProps += sep;
-                    bodyProps += name + equ + value;
+            QString name(iter->first.c_str());
+            QString value(iter->second.asString().c_str());
+            if (bodyProperties.contains(name)) {
+                if (firstBody)
+                    firstBody = false;
+                else
+                    bodyProps += sep;
+                bodyProps += name + equ + value;
 
-                } else {
-                    QString prop = name + equ + value;
-                    propList << prop;
-                }
-
-
-                if (summaryProperties.contains(name)) {
-                    if (firstSum)
-                         firstSum = false;
-                     else
-                         summary += sep;
-                     summary += name + equ + value;
-                }
-
+            } else {
+                QString prop = name + equ + value;
+                propList << prop;
             }
-            ObjectIndexPtr pptr(updateOrInsertNode(summaries, NODE_SUMMARY, ObjectIndexPtr(),
-                                                 summary.toStdString(), messageId,
-                                                 event, callArgs, QModelIndex()));
 
-            QStringList::const_iterator iter = propList.constBegin();
-            const QStringList::const_iterator end = propList.constEnd();
-            for (; iter != end; ++iter) {
-                updateOrInsertNode(pptr->children, NODE_DETAIL, pptr,
-                      (*iter).toStdString(), messageId,
-                      event, callArgs, createIndex(pptr->row, 0, pptr->id));
+
+            if (summaryProperties.contains(name)) {
+                if (firstSum)
+                     firstSum = false;
+                 else
+                     summary += sep;
+                 summary += name + equ + value;
             }
-            // add the message body properties last
-            ObjectIndexPtr sptr(updateOrInsertNode(pptr->children, NODE_BODY, pptr,
-                  bodyProps.toStdString(), messageId,
-                  event, callArgs, createIndex(pptr->row, 0, pptr->id)));
-            // insert a body display node
-            if (sptr->children.size() == 0)
-                updateOrInsertNode(sptr->children, NODE_BODY_DISPLAY, sptr,
-                             "please wait...", messageId,
-                             event, callArgs, createIndex(sptr->row, 0, sptr->id));
+
         }
+        ObjectIndexPtr pptr(updateOrInsertNode(summaries, NODE_SUMMARY, ObjectIndexPtr(),
+                                             summary.toStdString(), messageId,
+                                             event, callArgs, QModelIndex()));
+
+        QStringList::const_iterator iter = propList.constBegin();
+        const QStringList::const_iterator end = propList.constEnd();
+        for (; iter != end; ++iter) {
+            updateOrInsertNode(pptr->children, NODE_DETAIL, pptr,
+                  (*iter).toStdString(), messageId,
+                  event, callArgs, createIndex(pptr->row, 0, pptr->id));
+        }
+        // add the message body properties last
+        ObjectIndexPtr sptr(updateOrInsertNode(pptr->children, NODE_BODY, pptr,
+              bodyProps.toStdString(), messageId,
+              event, callArgs, createIndex(pptr->row, 0, pptr->id)));
+        // insert a body display node
+        if (sptr->children.size() == 0)
+            updateOrInsertNode(sptr->children, NODE_BODY_DISPLAY, sptr,
+                         "please wait...", messageId,
+                         event, callArgs, createIndex(sptr->row, 0, sptr->id));
+    }
 }
 
 void HeaderModel::clear()

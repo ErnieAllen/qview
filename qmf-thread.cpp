@@ -77,7 +77,7 @@ void QmfThread::run()
             std::string s;
             qpid::types::Variant::Map args;
 
-            if (sess.nextEvent(event, qpid::messaging::Duration::SECOND)) {
+            if (sess.nextEvent(event, qpid::messaging::Duration::SECOND * 2)) {
                 //
                 // Process the event
                 //
@@ -87,13 +87,13 @@ void QmfThread::run()
                 case qmf::CONSOLE_AGENT_ADD :
                     if (agent.getName() == sess.getConnectedBrokerAgent().getName()) {
                         // we just got the broker agent
-                        // get the schema so we can get the broker object so we can make calls
+                        // get the broker object so we can make calls
                         event = agent.query(qmf::Query(qmf::QUERY_OBJECT, "broker", "org.apache.qpid.broker"));
                         pcount = event.getDataCount();
                         if (pcount == 1)
                             brokerData = event.getData(0);
 
-                        // get the queues objects for this broker
+                        // get the queue objects for this broker
                         agent.queryAsync(qmf::Query(qmf::QUERY_OBJECT, "queue", "org.apache.qpid.broker"));
                     }
                     break;
@@ -103,13 +103,14 @@ void QmfThread::run()
                     break;
 
                 case qmf::CONSOLE_QUERY_RESPONSE :
-                    // Handle the query response
+                    // Handle the query response from the QUERY_OBJECT for queue
+                    // Currently, this is the only async query called
                     pcount = event.getDataCount();
                     for (uint32_t idx = 0; idx < pcount; idx++) {
-                        emit addObject(event.getData(idx));
+                        emit addQueue(event.getData(idx), event.getCorrelator());
                     }
-
-                    emit queuesAdded();
+                    if (event.isFinal())
+                        emit doneAddingQueues(event.getCorrelator());
                     break;
 
                 case qmf::CONSOLE_METHOD_RESPONSE :
@@ -130,8 +131,9 @@ void QmfThread::run()
 
             } else {
                 // update the list of queues every second
-                if (!pausedRefreshes)
+                if (!pausedRefreshes) {
                     sess.getConnectedBrokerAgent().queryAsync(qmf::Query(qmf::QUERY_OBJECT, "queue", "org.apache.qpid.broker"));
+                }
             }
 
             {
