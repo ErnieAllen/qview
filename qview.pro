@@ -17,8 +17,7 @@ SOURCES += main.cpp\
     dialogabout.cpp \
     dialogpurge.cpp \
     queuetableview.cpp \
-    dialogcopy.cpp \
-    copyqueue.cpp
+    dialogcopy.cpp
 
 HEADERS  += \
     main.h \
@@ -29,8 +28,7 @@ HEADERS  += \
     dialogabout.h \
     dialogpurge.h \
     queuetableview.h \
-    dialogcopy.h \
-    copyqueue.h
+    dialogcopy.h
 
 FORMS    += \
     qview_main.ui \
@@ -42,7 +40,7 @@ FORMS    += \
 OTHER_FILES += \
     license.txt \
     README.txt \ 
-    broker_methods_2.diff
+    queue.xsd
 
 RESOURCES += \
     toolbar_icons.qrc

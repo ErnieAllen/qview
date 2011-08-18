@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>400</width>
-    <height>332</height>
+    <height>226</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -38,62 +38,6 @@ background-color: #ffdddd;</string>
     </widget>
    </item>
    <item>
-    <widget class="QGroupBox" name="groupBoxCopyWhat">
-     <property name="maximumSize">
-      <size>
-       <width>16777215</width>
-       <height>80</height>
-      </size>
-     </property>
-     <property name="styleSheet">
-      <string notr="true">QGroupBox {
-     border: 2px solid gray;
-     border-radius: 5px;
-     margin-top: 1ex; /* leave space at the top for the title */
- }
-
- QGroupBox::title {
-     subcontrol-origin: margin;
-     subcontrol-position: top left; /* position at the top center */
-     padding: 0 3px;
-	left: 1em;
- }</string>
-     </property>
-     <property name="title">
-      <string>What to export</string>
-     </property>
-     <widget class="QRadioButton" name="radioButtonCopyAll">
-      <property name="geometry">
-       <rect>
-        <x>20</x>
-        <y>20</y>
-        <width>311</width>
-        <height>26</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>All messages in the selected queue</string>
-      </property>
-      <property name="checked">
-       <bool>true</bool>
-      </property>
-     </widget>
-     <widget class="QRadioButton" name="radioButtonCopySelected">
-      <property name="geometry">
-       <rect>
-        <x>20</x>
-        <y>40</y>
-        <width>291</width>
-        <height>26</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>Selected message</string>
-      </property>
-     </widget>
-    </widget>
-   </item>
-   <item>
     <widget class="QGroupBox" name="groupBoxCopyWhere">
      <property name="maximumSize">
       <size>
@@ -102,27 +46,16 @@ background-color: #ffdddd;</string>
       </size>
      </property>
      <property name="styleSheet">
-      <string notr="true">QGroupBox {
-     border: 2px solid gray;
-     border-radius: 5px;
-     margin-top: 1ex; /* leave space at the top for the title */
- }
-
- QGroupBox::title {
-     subcontrol-origin: margin;
-     subcontrol-position: top left; /* position at the top center */
-     padding: 0 3px;
-	left: 1em;
- }</string>
+      <string notr="true"/>
      </property>
      <property name="title">
-      <string>Where</string>
+      <string/>
      </property>
      <widget class="QRadioButton" name="radioButtonCopyClipboard">
       <property name="geometry">
        <rect>
         <x>20</x>
-        <y>20</y>
+        <y>10</y>
         <width>311</width>
         <height>26</height>
        </rect>
@@ -154,7 +87,7 @@ background-color: #ffdddd;</string>
       <property name="geometry">
        <rect>
         <x>40</x>
-        <y>70</y>
+        <y>80</y>
         <width>271</width>
         <height>31</height>
        </rect>
@@ -167,7 +100,7 @@ background-color: #ffdddd;</string>
       <property name="geometry">
        <rect>
         <x>310</x>
-        <y>70</y>
+        <y>80</y>
         <width>31</width>
         <height>31</height>
        </rect>

@@ -86,6 +86,11 @@ private:
     QToolButton *refreshButton;
     QMenu *headerPopupMenu;
 
+    QString exportQueue();
+    QString exportAllMessages();
+    QString exportMessageBody(const MessageIndex& header, const std::string& contentType);
+    QString decodeBody(const qpid::types::Variant& var, const std::string& contentType);
+
 
 private slots:
     void on_lineEdit_queue_filter_textChanged(QString );

@@ -37,6 +37,11 @@ Q_DECLARE_METATYPE(qmf::Data);
 Q_DECLARE_METATYPE(qmf::ConsoleEvent);
 Q_DECLARE_METATYPE(qpid::types::Variant::Map);
 
+class MessageIndex;
+typedef boost::shared_ptr<MessageIndex> MessageIndexPtr;
+typedef std::map<quint32, MessageIndexPtr> IndexMap;
+typedef std::list<MessageIndexPtr> IndexList;
+
 class HeaderModel : public QAbstractItemModel {
     Q_OBJECT
 
@@ -51,6 +56,9 @@ public:
     QModelIndex index(int row, int column, const QModelIndex &parent = QModelIndex()) const;
     const qpid::types::Variant::Map& args(const QModelIndex& index);
 
+    const IndexList& getMessageHeaderList();
+
+    typedef enum { NODE_SUMMARY, NODE_DETAIL, NODE_BODY, NODE_BODY_DISPLAY } NodeType;
 
 public slots:
     void addHeader(const qmf::ConsoleEvent&, const qpid::types::Variant::Map&);
@@ -63,30 +71,12 @@ signals:
     void summarySelected(const QModelIndex&);
 
 private:
-    typedef enum { NODE_SUMMARY, NODE_DETAIL, NODE_BODY, NODE_BODY_DISPLAY } NodeType;
-    struct ObjectIndex;
-    typedef boost::shared_ptr<ObjectIndex> ObjectIndexPtr;
-    typedef std::map<quint32, ObjectIndexPtr> IndexMap;
-    typedef std::list<ObjectIndexPtr> IndexList;
-
-    struct ObjectIndex {
-        quint32 id;
-        int row;
-        NodeType nodeType;
-        std::string text;
-        std::string messageId;
-        ObjectIndexPtr parent;
-        IndexList children;
-        qmf::ConsoleEvent event;
-        qpid::types::Variant::Map args;
-    };
-
     IndexList summaries;
     IndexMap linkage;
     quint32 nextId;
 
     void renumber(IndexList&);
-    ObjectIndexPtr updateOrInsertNode(IndexList& list, NodeType nodeType, ObjectIndexPtr parent,
+    MessageIndexPtr updateOrInsertNode(IndexList& list, NodeType nodeType, MessageIndexPtr parent,
                                   const std::string& text, const std::string& messageId, const qmf::ConsoleEvent& event,
                                   const qpid::types::Variant::Map& map, QModelIndex parentIndex);
 
@@ -96,6 +86,24 @@ private:
     //qpid::types::Variant::Map emptyMap;
 
 };
+
+
+class MessageIndex {
+public:
+    quint32 id;
+    int row;
+    HeaderModel::NodeType nodeType;
+    std::string text;
+    std::string messageId;
+    MessageIndexPtr parent;
+    IndexList children;
+    qmf::ConsoleEvent event;
+    qpid::types::Variant::Map args;
+
+    MessageIndex() { }
+};
+
+std::ostream& operator<<(std::ostream& out, const MessageIndex& value);
 
 #endif
 

@@ -60,8 +60,10 @@ void DialogCopy::accept()
                 return;
             }
         }
+        emit copyDialogAccepted(ui->lineEditCopyFileName->text());
+    } else {
+        emit copyDialogAccepted(QString());
     }
-    emit copyDialogAccepted(ui->lineEditCopyFileName->text());
     hide();;
 }
 

@@ -39,6 +39,7 @@ public:
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const;
     QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
 
+    const qmf::Data&        selectedQueue(const QModelIndex&);
     const qmf::Agent&       selectedQueueAgent(const QModelIndex&);
     const qmf::DataAddr&    selectedQueueDataAddr(const QModelIndex&);
     QString                 selectedQueueName(const QModelIndex&);
@@ -80,6 +81,7 @@ private:
 
 };
 
+std::ostream& operator<<(std::ostream& out, const qmf::Data& queue);
 
 #endif
 

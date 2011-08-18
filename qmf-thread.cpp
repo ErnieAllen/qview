@@ -283,6 +283,7 @@ void QmfThread::getQueueHeaders(const QString& name)
 
 void QmfThread::queueRemoveMessage(const QString& name, const qpid::types::Variant::Map& args)
 {
+    Q_UNUSED(name);
     qmf::Agent agent = brokerData.getAgent();
 
     // submit an asyncronous call to remove the message
@@ -313,6 +314,11 @@ void QmfThread::showBody(const QModelIndex& index, const qmf::ConsoleEvent &even
     }
 }
 
+qmf::ConsoleEvent QmfThread::fetchBody(const qpid::types::Variant::Map& args)
+{
+    qmf::Agent agent = brokerData.getAgent();
+    return agent.callMethod("queueGetMessageBody", args, brokerData.getAddr());
+}
 
 void QmfThread::pauseRefreshes(bool checked)
 {

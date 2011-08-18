@@ -43,7 +43,7 @@ public:
     void cancel();
     void getQueueHeaders(const QString&);
     void queueRemoveMessage(const QString&, const qpid::types::Variant::Map&);
-
+    qmf::ConsoleEvent fetchBody(const qpid::types::Variant::Map&);
 
 public slots:
     void connect_localhost();

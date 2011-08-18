@@ -52,12 +52,12 @@ void HeaderModel::renumber(IndexList& list)
 }
 
 
-HeaderModel::ObjectIndexPtr
-HeaderModel::updateOrInsertNode(IndexList& list, NodeType nodeType, ObjectIndexPtr parent,
+MessageIndexPtr
+HeaderModel::updateOrInsertNode(IndexList& list, NodeType nodeType, MessageIndexPtr parent,
                               const std::string& text, const std::string& messageId, const qmf::ConsoleEvent& event,
                               const qpid::types::Variant::Map& map, QModelIndex parentIndex)
 {
-    ObjectIndexPtr node;
+    MessageIndexPtr node;
     int rowCount;
 
     IndexList::iterator iter(list.begin());
@@ -94,7 +94,7 @@ HeaderModel::updateOrInsertNode(IndexList& list, NodeType nodeType, ObjectIndexP
         // A new data record needs to be inserted in-order in the list.
         //
         beginInsertRows(parentIndex, rowCount, rowCount);
-        node.reset(new ObjectIndex());
+        node.reset(new MessageIndex());
         node->id = nextId++;
         node->nodeType = nodeType;
         node->text = text;
@@ -148,6 +148,37 @@ void HeaderModel::addHeader(const qmf::ConsoleEvent& event, const qpid::types::V
 
             QString name(iter->first.c_str());
             QString value(iter->second.asString().c_str());
+
+            switch (iter->second.getType()) {
+            case qpid::types::VAR_UINT8:
+            case qpid::types::VAR_UINT16:
+            case qpid::types::VAR_UINT32:
+            case qpid::types::VAR_UINT64:
+            case qpid::types::VAR_INT8:
+            case qpid::types::VAR_INT16:
+            case qpid::types::VAR_INT32:
+            case qpid::types::VAR_INT64:
+                value = QString::number((qulonglong)iter->second.asUint64());
+                break;
+            case qpid::types::VAR_FLOAT:
+            case qpid::types::VAR_DOUBLE:
+                value = QString::number((double)iter->second.asDouble());
+                break;
+
+            case qpid::types::VAR_STRING:
+            case qpid::types::VAR_BOOL:
+            case qpid::types::VAR_UUID:
+            case qpid::types::VAR_VOID:
+                value = "\"" + QString(iter->second.asString().c_str()) + "\"";
+                break;
+            case qpid::types::VAR_MAP:
+                value = QString("<map/>");
+                break;
+            case qpid::types::VAR_LIST:
+                value = QString("<list/>");
+                break;
+            }
+
             if (bodyProperties.contains(name)) {
                 if (firstBody)
                     firstBody = false;
@@ -170,7 +201,7 @@ void HeaderModel::addHeader(const qmf::ConsoleEvent& event, const qpid::types::V
             }
 
         }
-        ObjectIndexPtr pptr(updateOrInsertNode(summaries, NODE_SUMMARY, ObjectIndexPtr(),
+        MessageIndexPtr pptr(updateOrInsertNode(summaries, NODE_SUMMARY, MessageIndexPtr(),
                                              summary.toStdString(), messageId,
                                              event, callArgs, QModelIndex()));
 
@@ -182,7 +213,7 @@ void HeaderModel::addHeader(const qmf::ConsoleEvent& event, const qpid::types::V
                   event, callArgs, createIndex(pptr->row, 0, pptr->id));
         }
         // add the message body properties last
-        ObjectIndexPtr sptr(updateOrInsertNode(pptr->children, NODE_BODY, pptr,
+        MessageIndexPtr sptr(updateOrInsertNode(pptr->children, NODE_BODY, pptr,
               bodyProps.toStdString(), messageId,
               event, callArgs, createIndex(pptr->row, 0, pptr->id)));
         // insert a body display node
@@ -211,7 +242,7 @@ void HeaderModel::selected(const QModelIndex& index)
     IndexMap::const_iterator iter(linkage.find(id));
     if (iter == linkage.end())
         return;
-    const ObjectIndexPtr ptr(iter->second);
+    const MessageIndexPtr ptr(iter->second);
 
     switch (ptr->nodeType) {
     case NODE_SUMMARY:
@@ -232,8 +263,8 @@ void HeaderModel::setBodyText(const QModelIndex& index, const QString& body)
     IndexMap::const_iterator iter(linkage.find(id));
     if (iter == linkage.end())
         return;
-    const ObjectIndexPtr ptr(iter->second);
-    const ObjectIndexPtr bodyNode(ptr->children.front());
+    const MessageIndexPtr ptr(iter->second);
+    const MessageIndexPtr bodyNode(ptr->children.front());
 
 
     bodyNode->text = body.toStdString();
@@ -259,7 +290,7 @@ int HeaderModel::rowCount(const QModelIndex &parent) const
     IndexMap::const_iterator iter(linkage.find(id));
     if (iter == linkage.end())
         return 0;
-    const ObjectIndexPtr ptr(iter->second);
+    const MessageIndexPtr ptr(iter->second);
 
     //
     // For parents, return the number of children.
@@ -308,7 +339,7 @@ QVariant HeaderModel::data(const QModelIndex &index, int role) const
         IndexMap::const_iterator liter(linkage.find(id));
         if (liter == linkage.end())
             return QVariant();
-        const ObjectIndexPtr ptr(liter->second);
+        const MessageIndexPtr ptr(liter->second);
 
 
         if (role == Qt::DisplayRole)
@@ -335,7 +366,7 @@ const qpid::types::Variant::Map& HeaderModel::args(const QModelIndex& index)
         quint32 id(index.internalId());
         IndexMap::const_iterator liter(linkage.find(id));
         if (liter != linkage.end()) {
-            const ObjectIndexPtr ptr(liter->second);
+            const MessageIndexPtr ptr(liter->second);
             return ptr->args;
         }
     }
@@ -363,7 +394,7 @@ QModelIndex HeaderModel::parent(const QModelIndex& index) const
     IndexMap::const_iterator iter(linkage.find(id));
     if (iter == linkage.end())
         return QModelIndex();
-    ObjectIndexPtr ptr(iter->second);
+    MessageIndexPtr ptr(iter->second);
 
     //
     // Handle the top level node case
@@ -408,7 +439,7 @@ QModelIndex HeaderModel::index(int row, int column, const QModelIndex &parent) c
     IndexMap::const_iterator link = linkage.find(id);
     if (link == linkage.end())
         return QModelIndex();
-    ObjectIndexPtr ptr(link->second);
+    MessageIndexPtr ptr(link->second);
 
     //
     // Create an index for the child data record.
@@ -436,3 +467,33 @@ QModelIndex HeaderModel::index(int row, int column, const QModelIndex &parent) c
     return QModelIndex();
 }
 
+std::ostream& operator<<(std::ostream& out, const MessageIndex& header)
+{
+    out << "   <arguments>\n";
+
+    // get the arguments returned in the call results
+    const qpid::types::Variant::Map& args(header.event.getArguments());
+
+    // loop through the retuened arguments and add them to the xml stream
+    qpid::types::Variant::Map::const_iterator iter;
+    for (iter = args.begin();
+       iter != args.end(); iter++) {
+
+       qpid::types::Variant::Map attrs = (iter->second).asMap();
+       for (qpid::types::Variant::Map::const_iterator iter = attrs.begin();
+            iter != attrs.end(); iter++) {
+            out << "    <argument>\n";
+            out << "      <name>" << iter->first << "</name>\n";
+            out << "      <value>" << iter->second << "</value>\n";
+            out << "    </argument>\n";
+        }
+    }
+
+    out << "   </arguments>\n";
+    return out;
+}
+
+const IndexList& HeaderModel::getMessageHeaderList()
+{
+    return this->summaries;
+}

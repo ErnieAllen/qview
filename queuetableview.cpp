@@ -30,6 +30,13 @@ bool QueueTableView::hasSelected()
     return index.row() >= 0;
 }
 
+const qmf::Data& QueueTableView::selectedQueue(QueueTableModel *model, QSortFilterProxyModel *proxy)
+{
+    QModelIndex index = currentIndex();
+    QModelIndex sindex = proxy->mapToSource(index);
+    return model->selectedQueue(sindex);
+}
+
 const qmf::Agent& QueueTableView::selectedQueueAgent(QueueTableModel *model, QSortFilterProxyModel *proxy)
 {
     QModelIndex index = currentIndex();

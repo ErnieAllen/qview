@@ -31,8 +31,9 @@ public:
     explicit QueueTableView(QWidget *parent = 0);
 
     QString                 selectedQueueName(QueueTableModel *, QSortFilterProxyModel *);
-    const qmf::Agent&       selectedQueueAgent(QueueTableModel *model, QSortFilterProxyModel *);
-    const qmf::DataAddr&    selectedQueueDataAddr(QueueTableModel *model, QSortFilterProxyModel *);
+    const qmf::Data&        selectedQueue(QueueTableModel *, QSortFilterProxyModel *);
+    const qmf::Agent&       selectedQueueAgent(QueueTableModel *, QSortFilterProxyModel *);
+    const qmf::DataAddr&    selectedQueueDataAddr(QueueTableModel *, QSortFilterProxyModel *);
     QVariant                selectedQueueDepth(QueueTableModel *, QSortFilterProxyModel *);
 
     bool                    hasSelected();

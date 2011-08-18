@@ -397,30 +397,33 @@ void QView::gotBody(const qmf::ConsoleEvent &event, const qpid::types::Variant::
         const qpid::types::Variant::Map& results(event.getArguments());
         iter = results.find("body");
         if (iter != results.end()) {
-            if (contentType == "amqp/map") {
-
-                qpid::messaging::Message message;
-                message.setContent(iter->second.asString());
-                message.setContentType(contentType);
-
-                qpid::types::Variant::Map bodyMap;
-                qpid::messaging::decode(message, bodyMap);
-
-                std::stringstream bodyStream;
-                bodyStream << bodyMap;
-                body = QString(bodyStream.str().c_str());
-                //textBrowser_body->setText(QString(bodyStream.str().c_str()));
-            } else if (contentType == "amqp/list") {
-                body = QString("TODO: decode the list");
-                //textBrowser_body->setText(QString("TODO: decode the list"));
-            } else {
-                body = QString(iter->second.asString().c_str());
-                //textBrowser_body->setText(QString(iter->second.asString().c_str()));
-            }
+            body = decodeBody(iter->second, contentType);
             headerModel->setBodyText(index, body);
         }
     }
+}
 
+QString QView::decodeBody(const qpid::types::Variant& var, const std::string& contentType)
+{
+    QString body;
+    if (contentType == "amqp/map") {
+
+        qpid::messaging::Message message;
+        message.setContent(var.asString());
+        message.setContentType(contentType);
+
+        qpid::types::Variant::Map bodyMap;
+        qpid::messaging::decode(message, bodyMap);
+
+        std::stringstream bodyStream;
+        bodyStream << bodyMap;
+        body = QString(bodyStream.str().c_str());
+    } else if (contentType == "amqp/list") {
+        body = QString("TODO: decode the list");
+    } else {
+        body = QString(var.asString().c_str());
+    }
+    return body;
 }
 
 // SLOT: The purge dialog was accepted. Send the request and update the display
@@ -445,8 +448,97 @@ void QView::queuePurge(uint count)
 // SLOT: The copy dialog was accepted. Copy the message headers/body
 void QView::queueCopy(const QString& file)
 {
-    QString f = file;
+    QString xml = exportQueue();
+    if (file.isEmpty()) {
+        QClipboard *clipboard = QApplication::clipboard();
+        clipboard->setText(xml);
+    } else {
+        QFile f(file);
+        if (f.open(QIODevice::WriteOnly)) {
+            f.write(xml.toStdString().c_str());
+            f.close();
+        }
+    }
+}
 
+QString QView::exportQueue()
+{
+    std::stringstream buff;
+    const qmf::Data& queue(tableView_object->selectedQueue(queueModel, queueProxyModel));
+    qpid::types::Variant::Map::const_iterator iter;
+    const qpid::types::Variant::Map& attrs(queue.getProperties());
+
+    // treat the queue name property as an attribute in the xml file
+    buff << "<queue";
+    iter = attrs.find("name");
+    if (iter != attrs.end()) {
+        buff << " name=\"" << iter->second.asString() << "\"";
+    }
+    buff << ">\n";
+
+    // export all the other properties
+    buff << queue;
+
+    // export all the message properties
+    QString messages = exportAllMessages();
+    buff << messages.toStdString();
+
+    buff << "</queue>\n";
+
+    return QString(buff.str().c_str());
+}
+
+QString QView::exportAllMessages()
+{
+    std::stringstream buff;
+    QString body;
+    std::string contentType;
+
+    const IndexList& messages(headerModel->getMessageHeaderList());
+    buff << " <messages>\n";
+
+    IndexList::const_iterator iter;
+    iter = messages.begin();
+    while (iter != messages.end()) {
+
+        buff << "  <message sequence=\"" << (**iter).messageId << "\">\n";
+
+        // add all the message header attributes
+        buff << **iter;
+
+        // add the body
+        qpid::types::Variant::Map::const_iterator i;
+        const qpid::types::Variant::Map& m1((**iter).event.getArguments());
+        i = m1.begin();
+        const qpid::types::Variant::Map& m(i->second.asMap());
+        i = m.find("ContentType");
+        if (i != m.end()) {
+            contentType = i->second.asString();
+            body = exportMessageBody(**iter, contentType);
+            buff << "   <body>";
+            buff << body.toStdString();
+            buff << "</body>\n";
+        }
+
+        buff << "  </message>\n";
+        iter++;
+    }
+
+    buff << " </messages>\n";
+    return QString(buff.str().c_str());
+}
+
+QString QView::exportMessageBody(const MessageIndex& header, const std::string& contentType)
+{
+    qmf::ConsoleEvent bodyEvent = qmf->fetchBody(header.args);
+    if (bodyEvent.getType() == qmf::CONSOLE_METHOD_RESPONSE) {
+        const qpid::types::Variant::Map& results(bodyEvent.getArguments());
+        qpid::types::Variant::Map::const_iterator iter = results.find("body");
+        if (iter != results.end()) {
+            return decodeBody(iter->second, contentType);
+        }
+    }
+    return QString();
 }
 
 // SLOT: Show/Hide the Connection toolbar

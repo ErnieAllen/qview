@@ -203,6 +203,14 @@ QVariant QueueTableModel::headerData(int section, Qt::Orientation orientation, i
     return QVariant();
 }
 
+const qmf::Data& QueueTableModel::selectedQueue(const QModelIndex& selectedIndex)
+{
+    if (selectedIndex.isValid()) {
+        return dataList.at(selectedIndex.row());
+    }
+    return qmf::Data();
+}
+
 const qmf::Agent& QueueTableModel::selectedQueueAgent(const QModelIndex& selectedIndex)
 {
     return dataList.at(selectedIndex.row()).getAgent();
@@ -279,4 +287,24 @@ void QueueTableModel::refresh(uint correlator)
     QModelIndex topLeft = index(0, 0);
     QModelIndex bottomRight = index(dataList.size() - 1, 2);
     emit dataChanged ( topLeft, bottomRight );
+}
+
+std::ostream& operator<<(std::ostream& out, const qmf::Data& queue)
+{
+    if (queue.isValid()) {
+        qpid::types::Variant::Map::const_iterator iter;
+        const qpid::types::Variant::Map& attrs(queue.getProperties());
+
+        out << " <properties>\n";
+        for (iter = attrs.begin(); iter != attrs.end(); iter++) {
+            if (iter->first != "name") {
+                out << "  <property>\n";
+                out << "   <name>" << iter->first << "</name>\n";
+                out << "   <value>" << iter->second << "</value>\n";
+                out << "  </property>\n";
+            }
+        }
+        out << " </properties>\n";
+    }
+    return out;
 }
