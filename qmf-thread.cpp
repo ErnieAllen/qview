@@ -261,12 +261,13 @@ void QmfThread::getQueueHeaders(const QString& name)
         qpid::types::Variant::Map callMap;
 
         callMap["name"] = name.toStdString();
-        // for each header id, get the message header
-        const qpid::types::Variant::Map& args(event.getArguments());
-        for (qpid::types::Variant::Map::const_iterator iter = args.begin();
-           iter != args.end(); iter++) {
 
+        // get the list of ids
+        const qpid::types::Variant::Map& args(event.getArguments());
+        qpid::types::Variant::Map::const_iterator iter = args.begin();
+        if (iter != args.end()) {
            qpid::types::Variant::List sublist = (iter->second).asList();
+           // for each header id, get the message header
            for (qpid::types::Variant::List::const_iterator subIter = sublist.begin();
                  subIter != sublist.end(); subIter++) {
                 messageId = *subIter;

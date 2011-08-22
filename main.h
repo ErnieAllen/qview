@@ -58,6 +58,7 @@ public slots:
     void queuePurge(uint);
     void queueCopy(const QString&);
     void getHeaderIds();
+    void gotHeader(const qmf::ConsoleEvent&, const qpid::types::Variant::Map&);
     void messageRemoved(const qmf::ConsoleEvent& event, const qpid::types::Variant::Map& callArgs);
     void gotBody(const qmf::ConsoleEvent &event, const qpid::types::Variant::Map &args, const QModelIndex& index);
     void qmfException(const QString&);

@@ -83,6 +83,7 @@ QView::QView(QMainWindow* parent) : QMainWindow(parent)
     queueProxyModel = new QSortFilterProxyModel(this);
     queueProxyModel->setSourceModel(queueModel);
     queueProxyModel->setFilterKeyColumn(0);
+    queueProxyModel->setDynamicSortFilter(true);
 
     //
     // Assign the proxy model to the view
@@ -133,7 +134,7 @@ QView::QView(QMainWindow* parent) : QMainWindow(parent)
 
     connect(qmf, SIGNAL(addQueue(qmf::Data,uint)), queueModel, SLOT(addQueue(qmf::Data,uint)));
     connect(qmf, SIGNAL(doneAddingQueues(uint)), this, SLOT(doneAddingQueues(uint)));
-    connect(qmf, SIGNAL(gotMessageHeaders(qmf::ConsoleEvent, qpid::types::Variant::Map)), headerModel, SLOT(addHeader(qmf::ConsoleEvent, qpid::types::Variant::Map)));
+    connect(qmf, SIGNAL(gotMessageHeaders(qmf::ConsoleEvent, qpid::types::Variant::Map)), this, SLOT(gotHeader(qmf::ConsoleEvent,qpid::types::Variant::Map)));
     connect(qmf, SIGNAL(removedMessage(qmf::ConsoleEvent, qpid::types::Variant::Map)), this, SLOT(messageRemoved(qmf::ConsoleEvent,qpid::types::Variant::Map)));
     connect(actionRefresh, SIGNAL(toggled(bool)), qmf, SLOT(pauseRefreshes(bool)));
     connect(actionRefresh, SIGNAL(toggled(bool)), this, SLOT(on_actionRefresh_toggled(bool)));
@@ -322,7 +323,7 @@ void QView::queueSelected() {
     getHeaderIds();
 }
 
-// a batch of queues were just added
+// a batch of queues was just added
 void QView::doneAddingQueues(uint correlator)
 {
     // The first time queues are added, there is no selection in queue table, so select one
@@ -330,8 +331,11 @@ void QView::doneAddingQueues(uint correlator)
         tableView_object->selectRow(0);
         // and adjust the size of the name column
         tableView_object->resizeColumnToContents(0);
+        queueProxyModel->sort(0);
     }
 
+    // put any newly added queues in the correct order in the display
+    queueProxyModel->sort(queueProxyModel->sortColumn(), queueProxyModel->sortOrder());
 /*
     // If the selected queue has messages, enable the export action
     QVariant depth = tableView_object->selectedQueueDepth(queueModel, queueProxyModel);
@@ -352,6 +356,22 @@ void QView::getHeaderIds()
     if (tableView_object->hasSelected()) {
         QString name = tableView_object->selectedQueueName(queueModel, queueProxyModel);
         qmf->getQueueHeaders(name);
+    }
+}
+
+// SLOT: called when a batch of headers is received via qmf
+// Make sure the queue that requested the headers is still the current queue
+void QView::gotHeader(const qmf::ConsoleEvent& event, const qpid::types::Variant::Map& map)
+{
+    // get the name of the queue that requested the headers
+    const qpid::types::Variant::Map::const_iterator iter = map.find("name");
+    if (iter != map.end()) {
+        // get the name of the currently selected queue
+        QString name = tableView_object->selectedQueueName(queueModel, queueProxyModel);
+        if (name.toStdString() == iter->second.asString()) {
+            // go ahead and add the headers
+            headerModel->addHeader(event, map);
+        }
     }
 }
 

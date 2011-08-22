@@ -84,7 +84,8 @@ void QueueTableModel::addQueue(const qmf::Data& queue, uint correlator)
     q.setProperty("correlator", corr);
 
     // this is a new queue
-    beginInsertRows(QModelIndex(), 0, 0);
+    int last = dataList.size();
+    beginInsertRows(QModelIndex(), last, last);
     dataList.append(q);
     endInsertRows();
 }
