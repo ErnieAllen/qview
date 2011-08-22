@@ -65,6 +65,8 @@ public slots:
     void clear();
     void selected(const QModelIndex&);
     void setBodyText(const QModelIndex&, const QString&);
+    void expanded(const QModelIndex&);
+    void collapsed(const QModelIndex&);
 
 signals:
     void bodySelected(const QModelIndex&, const qmf::ConsoleEvent&, const qpid::types::Variant::Map&);
@@ -76,8 +78,11 @@ private:
     quint32 nextId;
 
     void renumber(IndexList&);
+
     MessageIndexPtr updateOrInsertNode(IndexList& list, NodeType nodeType, MessageIndexPtr parent,
-                                  const std::string& text, const std::string& messageId, const qmf::ConsoleEvent& event,
+                                  const QMap<QString, QString>& keysValues,
+                                  const std::string& messageId,
+                                  const qmf::ConsoleEvent& event,
                                   const qpid::types::Variant::Map& map, QModelIndex parentIndex);
 
     QStringList summaryProperties;
@@ -93,14 +98,19 @@ public:
     quint32 id;
     int row;
     HeaderModel::NodeType nodeType;
-    std::string text;
-    std::string messageId;
     MessageIndexPtr parent;
     IndexList children;
+
+    std::string text;       // constructed name=value list
+    std::string messageId;  // unique per message
+    QMap<QString, QString> nameValues;
+
+    // remember the returned data and the args used to get the data
     qmf::ConsoleEvent event;
     qpid::types::Variant::Map args;
+    bool expanded;
+    bool changed;
 
-    MessageIndex() { }
 };
 
 std::ostream& operator<<(std::ostream& out, const MessageIndex& value);

@@ -54,65 +54,77 @@ void HeaderModel::renumber(IndexList& list)
 
 MessageIndexPtr
 HeaderModel::updateOrInsertNode(IndexList& list, NodeType nodeType, MessageIndexPtr parent,
-                              const std::string& text, const std::string& messageId, const qmf::ConsoleEvent& event,
+                              const QMap<QString, QString>& keyValues,
+                              const std::string& messageId,
+                              const qmf::ConsoleEvent& event,
                               const qpid::types::Variant::Map& map, QModelIndex parentIndex)
 {
     MessageIndexPtr node;
     int rowCount;
+    bool prevChanged;
 
     IndexList::iterator iter(list.begin());
     rowCount = 0;
 
-    // always insert a new row
-    //rowCount = list.size();
-    //iter = list.end();
-/*
-    while (iter != list.end() && text > (*iter)->text) {
-        iter++;
-        rowCount++;
-    }
-*/
     if (nodeType == NODE_SUMMARY) {
-        // summary nodes may have the same text, so use the messageId
+        // Look for the unique messageId in the top level nodes
         while (iter != list.end() && messageId != (*iter)->messageId) {
             iter++;
             rowCount++;
         }
-    } else while (iter != list.end() && text != (*iter)->text) {
-        // all other nodes may have the same messageId, so use the text
+    } else while (iter != list.end() && (keyValues.keys() != (*iter)->nameValues.keys())) {
+        // all other nodes may have the same messageId, so look for the keys
         iter++;
         rowCount++;
     }
-/*
-    else {
-        rowCount = list.size();
-        iter = list.end();
-    }
-*/
-    if (iter == list.end() || text != (*iter)->text) {
-        //
-        // A new data record needs to be inserted in-order in the list.
-        //
+
+    if (iter == list.end()) {
+        // A new data record needs to be inserted in the list.
         beginInsertRows(parentIndex, rowCount, rowCount);
         node.reset(new MessageIndex());
         node->id = nextId++;
+        linkage[node->id] = node;
         node->nodeType = nodeType;
-        node->text = text;
+        node->expanded = false;
         node->messageId = messageId;
         node->parent = parent;
         node->event = event;
         node->args = map;
-        linkage[node->id] = node;
+        node->nameValues = keyValues;
 
-        if (iter == list.end())
-            list.push_back(node);
-        else
-            list.insert(iter, node);
+        list.push_back(node);
         renumber(list);
         endInsertRows();
-    } else
+    } else {
         node = *iter;
 
+        prevChanged = node->changed;
+        if (node->nameValues.values() != keyValues.values()) {
+            node->text = "";
+            node->changed = true;
+        }
+        else
+            node->changed = false;
+        node->nameValues = keyValues;
+
+        QModelIndex tl = createIndex(node->row, 0, node->id);
+        // we are updating an existing node
+        if ((node->text == "") || (prevChanged != node->changed)) {
+            // redraw the row that was just changed
+            emit dataChanged ( tl, tl );
+        } else if (node->nodeType == NODE_BODY) {
+            // if we are updating a BODY node, it *should* already have a child,
+            // but just in case...
+            if (node->children.size() > 0) {
+                if (node->expanded) {
+                    // if there is a body node and it is already expanded
+                    MessageIndexPtr ptr = node->children.front();
+                    // update the body text too
+                    emit bodySelected(tl, ptr->event, ptr->args);
+                }
+            }
+        }
+    }
     return node;
 }
 
@@ -132,14 +144,10 @@ void HeaderModel::addHeader(const qmf::ConsoleEvent& event, const qpid::types::V
     for (iter = args.begin();
        iter != args.end(); iter++) {
 
-       QStringList propList = QStringList();
-       QString summary = QString();
-       QString bodyProps = QString();
-       QString sep(", ");
-       QString equ("=");
-
-       bool firstSum = true;
-       bool firstBody = true;
+       QMap<QString, QString> detailMap;
+       QMap<QString, QString> summMap;
+       summMap[""] = QString(messageId.c_str());
+       QMap<QString, QString> bodyMap;
 
        qpid::types::Variant::Map attrs = (iter->second).asMap();
        // each argument in the map is concatenated
@@ -179,47 +187,44 @@ void HeaderModel::addHeader(const qmf::ConsoleEvent& event, const qpid::types::V
                 break;
             }
 
+            // add the property to either the body node or a detail node
             if (bodyProperties.contains(name)) {
-                if (firstBody)
-                    firstBody = false;
-                else
-                    bodyProps += sep;
-                bodyProps += name + equ + value;
-
+                bodyMap[name] = value;
             } else {
-                QString prop = name + equ + value;
-                propList << prop;
+                detailMap[name] = value;
             }
 
-
+            // also add the property to the summary node if appropriate
             if (summaryProperties.contains(name)) {
-                if (firstSum)
-                     firstSum = false;
-                 else
-                     summary += sep;
-                 summary += name + equ + value;
+                summMap[name] = value;
             }
 
         }
-        MessageIndexPtr pptr(updateOrInsertNode(summaries, NODE_SUMMARY, MessageIndexPtr(),
-                                             summary.toStdString(), messageId,
+        // add the top level summary node in the tree
+        MessageIndexPtr pptr(updateOrInsertNode(this->summaries, NODE_SUMMARY, MessageIndexPtr(),
+                                             summMap, messageId,
                                              event, callArgs, QModelIndex()));
 
-        QStringList::const_iterator iter = propList.constBegin();
-        const QStringList::const_iterator end = propList.constEnd();
-        for (; iter != end; ++iter) {
+        // add all the message properties
+        QMap<QString, QString>::const_iterator iter = detailMap.constBegin();
+        QMap<QString, QString> prop;
+        for (; iter != detailMap.constEnd(); ++iter) {
+            prop.clear();
+            prop[iter.key()] = iter.value();
             updateOrInsertNode(pptr->children, NODE_DETAIL, pptr,
-                  (*iter).toStdString(), messageId,
+                  prop, messageId,
                   event, callArgs, createIndex(pptr->row, 0, pptr->id));
         }
         // add the message body properties last
         MessageIndexPtr sptr(updateOrInsertNode(pptr->children, NODE_BODY, pptr,
-              bodyProps.toStdString(), messageId,
+              bodyMap, messageId,
               event, callArgs, createIndex(pptr->row, 0, pptr->id)));
         // insert a body display node
+        prop.clear();
+        prop["body"] = "...";
         if (sptr->children.size() == 0)
             updateOrInsertNode(sptr->children, NODE_BODY_DISPLAY, sptr,
-                         "please wait...", messageId,
+                         prop, messageId,
                          event, callArgs, createIndex(sptr->row, 0, sptr->id));
     }
 }
@@ -232,6 +237,28 @@ void HeaderModel::clear()
     endRemoveRows();
 }
 
+
+void HeaderModel::expanded(const QModelIndex &index)
+{
+    quint32 id(index.internalId());
+    IndexMap::const_iterator iter(linkage.find(id));
+    if (iter == linkage.end())
+        return;
+    const MessageIndexPtr ptr(iter->second);
+
+    ptr->expanded = true;
+}
+
+void HeaderModel::collapsed(const QModelIndex &index)
+{
+    quint32 id(index.internalId());
+    IndexMap::const_iterator iter(linkage.find(id));
+    if (iter == linkage.end())
+        return;
+    const MessageIndexPtr ptr(iter->second);
+
+    ptr->expanded = false;
+}
 
 void HeaderModel::selected(const QModelIndex& index)
 {
@@ -249,7 +276,7 @@ void HeaderModel::selected(const QModelIndex& index)
         emit summarySelected(index);
         break;
     case NODE_BODY:
-        if (ptr->children.front()->text == "please wait...")
+        if (ptr->children.front()->text == "")
             emit bodySelected(index, ptr->event, ptr->args);
         break;
     default:
@@ -264,14 +291,17 @@ void HeaderModel::setBodyText(const QModelIndex& index, const QString& body)
     if (iter == linkage.end())
         return;
     const MessageIndexPtr ptr(iter->second);
-    const MessageIndexPtr bodyNode(ptr->children.front());
 
+    MessageIndexPtr bodyNode(ptr->children.front());
 
-    bodyNode->text = body.toStdString();
-
-    QModelIndex tl = createIndex(bodyNode->row, 0, bodyNode->id);
-    emit dataChanged ( tl, tl );
-
+    bodyNode->changed = false;
+    if (bodyNode->text != body.toStdString()) {
+        bodyNode->text = "";
+        bodyNode->nameValues["body"] = body;
+        bodyNode->changed = true;
+        QModelIndex tl = createIndex(bodyNode->row, 0, bodyNode->id);
+        emit dataChanged ( tl, tl );
+    }
 }
 
 
@@ -341,9 +371,35 @@ QVariant HeaderModel::data(const QModelIndex &index, int role) const
             return QVariant();
         const MessageIndexPtr ptr(liter->second);
 
+        if (role == Qt::DisplayRole) {
+            if (ptr->text == "") {
+                std::string text;
+                std::string sep;
+                QMap<QString, QString>::const_iterator iter = ptr->nameValues.constBegin();
+                for (; iter != ptr->nameValues.constEnd(); ++iter) {
+                    text += sep;
+                    if (ptr->nodeType != NODE_BODY_DISPLAY) {
+                        if (iter.key() != "") {
+                            text += iter.key().toStdString();
+                            text += "=";
+                            sep = ", ";
+                        }
+                    }
+                    text += iter.value().toStdString();
+                }
+                // none of the message body properties were sent
+                if ((ptr->nodeType == NODE_BODY) && (text == ""))
+                    text = "Message body";
 
-        if (role == Qt::DisplayRole)
+                ptr->text = text;
+            }
             return QString(ptr->text.c_str());
+        }
+        if (ptr->changed) {
+            if (role == Qt::ForegroundRole) {
+                return QBrush(Qt::red);
+            }
+        }
         if (ptr->nodeType == NODE_BODY) {
             if (role == Qt::BackgroundRole)
                 return QBrush(Qt::yellow);

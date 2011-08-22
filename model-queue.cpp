@@ -106,16 +106,8 @@ void QueueTableModel::clear()
 
 int QueueTableModel::rowCount(const QModelIndex &parent) const
 {
-    //
-    // If the parent is invalid (top-level), return the number of attributes.
-    //
-    if (!parent.isValid())
-        return (int) dataList.size();
-
-    //
-    // This is not a tree so there are not child rows.
-    //
-    return 0;
+    Q_UNUSED(parent);
+    return (int) dataList.size();
 }
 
 

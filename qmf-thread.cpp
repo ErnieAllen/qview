@@ -302,16 +302,18 @@ void QmfThread::showBody(const QModelIndex& index, const qmf::ConsoleEvent &even
     qpid::types::Variant::Map::const_iterator iter = headerMap.begin();
     const qpid::types::Variant::Map& headerAttributes(iter->second.asMap());
     iter = headerAttributes.find("ContentType");
-    if (iter != headerAttributes.end()) {
-        std::string contentType = iter->second.asString();
 
-        qpid::types::Variant::Map map(args);
-        // remember the content type so we can decode the response properly
-        map["ContentType"] = contentType;
-        // make the call
-        addCallback(agent, "queueGetMessageBody", map, brokerData.getAddr(),
-                    SIGNAL(gotMessageBody()), index);
-    }
+    std::string contentType;
+
+    if (iter != headerAttributes.end())
+        contentType = iter->second.asString();
+
+    qpid::types::Variant::Map map(args);
+    // remember the content type so we can decode the response properly
+    map["ContentType"] = contentType;
+    // make the call
+    addCallback(agent, "queueGetMessageBody", map, brokerData.getAddr(),
+                SIGNAL(gotMessageBody()), index);
 }
 
 qmf::ConsoleEvent QmfThread::fetchBody(const qpid::types::Variant::Map& args)

@@ -70,6 +70,8 @@ QView::QView(QMainWindow* parent) : QMainWindow(parent)
     treeView_objects->header()->setMovable(false);
     treeView_objects->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(treeView_objects, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(headerCtxMenu(QPoint)));
+    connect(treeView_objects, SIGNAL(expanded(QModelIndex)), headerModel, SLOT(expanded(QModelIndex)));
+    connect(treeView_objects, SIGNAL(collapsed(QModelIndex)), headerModel, SLOT(collapsed(QModelIndex)));
 
     //
     // Create the object-detail model which holds the properties of an object.
@@ -390,16 +392,16 @@ void QView::showCopy()
 void QView::gotBody(const qmf::ConsoleEvent &event, const qpid::types::Variant::Map &args, const QModelIndex& index)
 {
     QString body;
+    std::string contentType;
     qpid::types::Variant::Map::const_iterator iter = args.find("ContentType");
-    if (iter != args.end()) {
-        std::string contentType = iter->second.asString();
+    if (iter != args.end())
+        contentType = iter->second.asString();
 
-        const qpid::types::Variant::Map& results(event.getArguments());
-        iter = results.find("body");
-        if (iter != results.end()) {
-            body = decodeBody(iter->second, contentType);
-            headerModel->setBodyText(index, body);
-        }
+    const qpid::types::Variant::Map& results(event.getArguments());
+    iter = results.find("body");
+    if (iter != results.end()) {
+        body = decodeBody(iter->second, contentType);
+        headerModel->setBodyText(index, body);
     }
 }
 
@@ -512,13 +514,12 @@ QString QView::exportAllMessages()
         i = m1.begin();
         const qpid::types::Variant::Map& m(i->second.asMap());
         i = m.find("ContentType");
-        if (i != m.end()) {
+        if (i != m.end())
             contentType = i->second.asString();
-            body = exportMessageBody(**iter, contentType);
-            buff << "   <body>";
-            buff << body.toStdString();
-            buff << "</body>\n";
-        }
+        body = exportMessageBody(**iter, contentType);
+        buff << "   <body>";
+        buff << body.toStdString();
+        buff << "</body>\n";
 
         buff << "  </message>\n";
         iter++;
