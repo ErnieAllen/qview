@@ -32,24 +32,43 @@ QueueTableModel::QueueTableModel(QObject* parent) : QAbstractTableModel(parent)
     queueColumns.append(Column("byteDepth", "Bytes", Qt::AlignRight, "N"));
     queueColumns.append(Column("byteTotalEnqueues", "In Bytes", Qt::AlignRight, "N"));
     queueColumns.append(Column("byteTotalDequeues", "Out Bytes", Qt::AlignRight, "N"));
+
+    managementQueues.append("amq.direct");
+    managementQueues.append("qmf.default.topic");
+    managementQueues.append("qmfa-");
+    managementQueues.append("qmfagent-");
+    managementQueues.append("qmfc-v2-");
+    managementQueues.append("reply-");
+    managementQueues.append("topic-");
 }
 
 
 bool QueueTableModel::isSystemQueue(const qmf::Data& queue)
 {
-    const qpid::types::Variant::Map& map(queue.getProperties());
-    qpid::types::Variant::Map::const_iterator iter;
-    iter = map.find("arguments");
-    if (iter != map.end()) {
-        const qpid::types::Variant::Map& args(iter->second.asMap());
-        iter = args.find("management");
-        if (iter == args.end()) {
-            return false;
-        }
-        return true;
+    QString name = QString(queue.getProperty("name").asString().c_str());
+    QStringList::const_iterator citer = managementQueues.constBegin();
+    while (citer != managementQueues.constEnd()) {
+        if (name.startsWith(*citer))
+            return true;
+        ++citer;
     }
-
+    return false;
     return queue.getProperty("exclusive").asBool();
+
+    // when management queues are defined by an agrument, modify and enable the following:
+    /*
+        const qpid::types::Variant::Map& map(queue.getProperties());
+        qpid::types::Variant::Map::const_iterator iter;
+        iter = map.find("arguments");
+        if (iter != map.end()) {
+            const qpid::types::Variant::Map& args(iter->second.asMap());
+            iter = args.find("management");
+            if (iter == args.end()) {
+                return false;
+            }
+            return true;
+        }
+    */
 }
 
 void QueueTableModel::addQueue(const qmf::Data& queue, uint correlator)

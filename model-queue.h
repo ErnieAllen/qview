@@ -78,7 +78,7 @@ private:
     QueueColumnList queueColumns;
     bool hideSystemQueues;
     bool isSystemQueue(const qmf::Data&);
-
+    QStringList managementQueues;
 };
 
 std::ostream& operator<<(std::ostream& out, const qmf::Data& queue);
