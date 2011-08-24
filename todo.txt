@@ -1,0 +1,26 @@
+TODO list:
+
+- Export
+    - Add progress bar animation during export
+    - Allow export without message bodies
+    - Allow export without messages (just queue properties)
+
+- Right click menu on queue
+    - Export this queue
+    - View all queue properties
+
+- Handle missing message properties
+    - Show missing property names in grey
+
+- Queue table
+    - Allow user to set which properties are visible as columns
+        - Save these in config file
+    - Fix bug with initial sort of queue name column (need to click twice before it sorts)
+
+- Allow user to set frequency of background updates
+
+- Queue delete
+
+- Queue copy (replicate)
+
+- Support multiple select on messages and allow delete/export of selected messages

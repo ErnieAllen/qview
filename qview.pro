@@ -40,7 +40,8 @@ FORMS    += \
 OTHER_FILES += \
     license.txt \
     README.txt \ 
-    queue.xsd
+    queue.xsd \
+    todo.txt
 
 RESOURCES += \
     toolbar_icons.qrc
