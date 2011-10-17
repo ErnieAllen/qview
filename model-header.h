@@ -67,6 +67,8 @@ public slots:
     void setBodyText(const QModelIndex&, const QString&);
     void expanded(const QModelIndex&);
     void collapsed(const QModelIndex&);
+    void updating(quint32 id, quint32 correlator);
+    void expire(quint32 correlator);
 
 signals:
     void bodySelected(const QModelIndex&, const qmf::ConsoleEvent&, const qpid::types::Variant::Map&);
@@ -110,6 +112,7 @@ public:
     qpid::types::Variant::Map args;
     bool expanded;
     bool changed;
+    quint32 correlator; // latest console event correlator used to update this record
 
 };
 

@@ -111,6 +111,8 @@ void QmfThread::run()
                     }
                     if (event.isFinal())
                         emit doneAddingQueues(event.getCorrelator());
+                    else
+                        pcount++;
                     break;
 
                 case qmf::CONSOLE_METHOD_RESPONSE :
@@ -249,6 +251,7 @@ void QmfThread::emitCallback(const Callback& cb, const qmf::ConsoleEvent& event)
 
 void QmfThread::getQueueHeaders(const QString& name)
 {
+    static quint32 correlator = 0;
     qpid::types::Variant::Map map;
     map["name"] = name.toStdString();
     // get the list of message header ids
@@ -256,7 +259,7 @@ void QmfThread::getQueueHeaders(const QString& name)
     qmf::ConsoleEvent event = agent.callMethod("queueGetIdList", map, brokerData.getAddr());
 
     if (event.getType() == qmf::CONSOLE_METHOD_RESPONSE) {
-
+        ++correlator;
         uint messageId = 0;
         qpid::types::Variant::Map callMap;
 
@@ -277,7 +280,11 @@ void QmfThread::getQueueHeaders(const QString& name)
                 // and request that the gotMessageHeaders signal be emitted when ready
                 addCallback(agent, "queueGetMessageHeader", callMap, brokerData.getAddr(),
                             SIGNAL(gotMessageHeaders()));
+                // update each header record in the tree to the current correlator
+                emit requestedMessageHeaders(messageId, correlator);
             }
+            // flush out any records in the tree that will not get updated
+            emit doneRequestingHeaders(correlator);
         }
     }
 }

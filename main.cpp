@@ -136,6 +136,10 @@ QView::QView(QMainWindow* parent) : QMainWindow(parent)
     connect(qmf, SIGNAL(doneAddingQueues(uint)), this, SLOT(doneAddingQueues(uint)));
     connect(qmf, SIGNAL(gotMessageHeaders(qmf::ConsoleEvent, qpid::types::Variant::Map)), this, SLOT(gotHeader(qmf::ConsoleEvent,qpid::types::Variant::Map)));
     connect(qmf, SIGNAL(removedMessage(qmf::ConsoleEvent, qpid::types::Variant::Map)), this, SLOT(messageRemoved(qmf::ConsoleEvent,qpid::types::Variant::Map)));
+    connect(qmf, SIGNAL(doneRequestingHeaders(quint32)), headerModel, SLOT(expire(quint32)));
+    connect(qmf, SIGNAL(requestedMessageHeaders(quint32,quint32)), headerModel, SLOT(updating(quint32,quint32)));
+
+
     connect(actionRefresh, SIGNAL(toggled(bool)), qmf, SLOT(pauseRefreshes(bool)));
     connect(actionRefresh, SIGNAL(toggled(bool)), this, SLOT(on_actionRefresh_toggled(bool)));
 

@@ -347,6 +347,36 @@ int HeaderModel::columnCount(const QModelIndex &parent) const
     return 1;
 }
 
+// SLOT triggered when a message in the tree is updated
+void HeaderModel::updating(quint32 id, quint32 correlator)
+{
+    QString mId = QString::number(id);
+
+    for (IndexList::iterator iter = summaries.begin(); iter != summaries.end(); iter++) {
+        MessageIndexPtr record = *iter;
+        if (mId.toStdString() == (*iter)->messageId) {
+            (*iter)->correlator = correlator;
+            break;
+        }
+    }
+}
+
+// SLOT triggered when all the messages in the tree have been updated
+// Remove all messages that did not get updated (because they were consumed)
+void HeaderModel::expire(quint32 correlator)
+{
+    int row = 0;
+    for (IndexList::iterator iter = summaries.begin(); iter != summaries.end(); iter++) {
+        MessageIndexPtr record = *iter;
+        if ((*iter)->correlator != correlator) {
+            beginRemoveRows( QModelIndex(), row, row );
+            iter = summaries.erase(iter);
+            --row;
+            endRemoveRows();
+        }
+        ++row;
+    }
+}
 
 QVariant HeaderModel::data(const QModelIndex &index, int role) const
 {

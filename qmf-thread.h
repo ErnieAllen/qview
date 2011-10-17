@@ -62,6 +62,8 @@ signals:
     void gotMessageHeaders(const qmf::ConsoleEvent&, const qpid::types::Variant::Map&);
     void gotMessageBody(const qmf::ConsoleEvent&, const qpid::types::Variant::Map&, const QModelIndex&);
     void removedMessage(const qmf::ConsoleEvent&, const qpid::types::Variant::Map&);
+    void requestedMessageHeaders(quint32, quint32);
+    void doneRequestingHeaders(quint32);
 
     void qmfError(const QString&);
 
